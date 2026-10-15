@@ -29,6 +29,7 @@ Order matters: deploy target + DNS first, portfolio merge last.
 - [x] Keep `innsights.jonhammond.org` attached and set it to redirect (308) to `lodgic.jonhammond.org`, or remove it once nothing links to it
 - [x] Redeploy; confirm wordmark + tab title read Lodgic
 - [x] Supabase dashboard: rename hosted project "Innsights AI" → "Lodgic" (Project Settings → General; cosmetic, no ref/URL change)
+- [x] Supabase Edge Function secret `ALLOWED_ORIGINS`: add `https://lodgic.jonhammond.org` (CORS preflight returned 403 from the new origin until this was set; no redeploy needed)
 
 ## 4. DNS (jonhammond.org)
 
