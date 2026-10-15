@@ -6,6 +6,13 @@ import { validateSql } from "./sql_guard.ts";
 import { CHARTS, SYSTEM_PROMPT } from "./schema_prompt.ts";
 import { parsePropertyIds, scopePrompt } from "./request.ts";
 import {
+  CACHE_BYPASS_HEADER,
+  cacheKey,
+  hashRows,
+  isFresh,
+  parseTtlHours,
+} from "./cache.ts";
+import {
   buildSummaryPrompt,
   clampSentences,
   SUMMARY_SCHEMA,
@@ -168,6 +175,17 @@ type GeminiOutput = {
   recommended_chart: (typeof CHARTS)[number];
   report_title: string;
   caveat?: string;
+};
+
+type CacheRow = {
+  sql: string;
+  chart: GeminiOutput["recommended_chart"];
+  title: string;
+  caveat: string;
+  rows_hash: string | null;
+  summary: string | null;
+  hits: number;
+  created_at: string;
 };
 
 async function geminiRequest(
@@ -401,13 +419,39 @@ async function handle(
     );
   }
 
-  // LLM
-  const gen = await callGemini(
-    scopePrompt(prompt, propertyIds),
-    geminiKey,
-    geminiModel,
-    geminiFallbackModel,
-  );
+  // Cache lookup (validated SQL from an earlier identical question)
+  const scoped = scopePrompt(prompt, propertyIds);
+  const key = await cacheKey(SYSTEM_PROMPT, scoped);
+  const bypass = req.headers.get(CACHE_BYPASS_HEADER) === "1";
+  const ttlHours = parseTtlHours(Deno.env.get("SQL_CACHE_TTL_HOURS"));
+  let cached: CacheRow | null = null;
+  if (!bypass) {
+    const { data, error } = await supabase
+      .from("ai_sql_cache")
+      .select("sql, chart, title, caveat, rows_hash, summary, hits, created_at")
+      .eq("cache_key", key)
+      .maybeSingle();
+    if (error) console.warn("ai_sql_cache lookup failed", error.code);
+    else if (
+      data && isFresh(data.created_at, ttlHours) &&
+      CHARTS.includes(data.chart) && validateSql(data.sql).ok
+    ) {
+      cached = data as CacheRow;
+    }
+  }
+
+  // LLM (skipped on cache hit)
+  let gen: GeminiOutput;
+  if (cached) {
+    gen = {
+      sql: cached.sql,
+      recommended_chart: cached.chart,
+      report_title: cached.title,
+      caveat: cached.caveat,
+    };
+  } else {
+    gen = await callGemini(scoped, geminiKey, geminiModel, geminiFallbackModel);
+  }
   const check = validateSql(gen.sql);
   if (!check.ok) {
     console.warn("rejected generated SQL:", check.reason);
@@ -434,24 +478,65 @@ async function handle(
     );
   }
 
-  const summary = await summarizeRows(
-    prompt,
-    gen.report_title,
-    rows ?? [],
-    gen.caveat ?? "",
-    geminiKey,
-    geminiModel,
-    geminiFallbackModel,
-  );
+  const resultRows = rows ?? [];
+  const rowsHash = await hashRows(resultRows);
+  let summary: string | null;
+  if (cached && cached.rows_hash === rowsHash && cached.summary) {
+    summary = cached.summary;
+  } else {
+    summary = await summarizeRows(
+      prompt,
+      gen.report_title,
+      resultRows,
+      gen.caveat ?? "",
+      geminiKey,
+      geminiModel,
+      geminiFallbackModel,
+    );
+  }
+
+  // Cache write (never fails the request)
+  if (cached) {
+    const patch: Record<string, unknown> = {
+      hits: cached.hits + 1,
+      last_hit_at: new Date().toISOString(),
+    };
+    if (cached.rows_hash !== rowsHash) {
+      patch.rows_hash = rowsHash;
+      patch.summary = summary;
+    }
+    supabase.from("ai_sql_cache").update(patch).eq("cache_key", key)
+      .then(({ error }) => {
+        if (error) console.warn("ai_sql_cache update failed", error.code);
+      });
+  } else if (resultRows.length > 0) {
+    supabase.from("ai_sql_cache").upsert({
+      cache_key: key,
+      prompt: scoped,
+      sql: check.sql,
+      chart: gen.recommended_chart,
+      title: gen.report_title,
+      caveat: gen.caveat ?? "",
+      model: geminiModel,
+      rows_hash: rowsHash,
+      summary,
+      hits: 0,
+      created_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) console.warn("ai_sql_cache upsert failed", error.code);
+    });
+  }
+  console.info(`cache ${cached ? "hit" : bypass ? "bypass" : "miss"}`);
 
   return json(
     {
       sql: check.sql,
       chart: gen.recommended_chart,
       title: gen.report_title,
-      rows: rows ?? [],
+      rows: resultRows,
       caveat: gen.caveat || null,
       summary,
+      cached: cached !== null,
       duration_ms: durationMs,
     },
     200,

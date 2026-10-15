@@ -27,7 +27,7 @@ for i in $(seq 0 $((N - 1))); do
   Q="$(jq -r ".[$i]" "$DIR/questions.json")"
   RESP="$(curl -s -X POST "$URL" \
     -H "Authorization: Bearer $ANON_KEY" -H "apikey: $ANON_KEY" \
-    -H "Content-Type: application/json" \
+    -H "Content-Type: application/json" -H "x-cache-bypass: 1" \
     -d "$(jq -n --arg p "$Q" '{prompt:$p}')")"
   ENTRY="$(printf '%s' "$RESP" | jq -c --arg q "$Q" \
     '{question:$q, chart:(.chart // null), title:(.title // null),
