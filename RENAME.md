@@ -18,23 +18,23 @@ Order matters: deploy target + DNS first, portfolio merge last.
 
 ## 2. GitHub
 
-- [ ] Rename repo `jonhammond/innsights-ai` → `jonhammond/lodgic` (Settings → General). GitHub redirects the old URL.
-- [ ] `git remote set-url origin git@github.com:jonhammond/lodgic.git`
-- [ ] `mv ~/Code/innsights-ai ~/Code/lodgic`; update any Serena/editor workspace paths
+- [x] Rename repo `jonhammond/innsights-ai` → `jonhammond/lodgic` (Settings → General). GitHub redirects the old URL.
+- [x] `git remote set-url origin git@github.com:jonhammond/lodgic.git`
+- [x] `mv ~/Code/innsights-ai ~/Code/lodgic`; update any Serena/editor workspace paths
 
 ## 3. Vercel
 
-- [ ] Rename project to `lodgic` (Settings → General). Confirm the Git integration re-links after the repo rename.
-- [ ] Domains: add `lodgic.jonhammond.org`
-- [ ] Keep `innsights.jonhammond.org` attached and set it to redirect (308) to `lodgic.jonhammond.org`, or remove it once nothing links to it
-- [ ] Redeploy; confirm wordmark + tab title read Lodgic
-- [ ] Supabase dashboard: rename hosted project "Innsights AI" → "Lodgic" (Project Settings → General; cosmetic, no ref/URL change)
+- [x] Rename project to `lodgic` (Settings → General). Confirm the Git integration re-links after the repo rename.
+- [x] Domains: add `lodgic.jonhammond.org`
+- [x] Keep `innsights.jonhammond.org` attached and set it to redirect (308) to `lodgic.jonhammond.org`, or remove it once nothing links to it
+- [x] Redeploy; confirm wordmark + tab title read Lodgic
+- [x] Supabase dashboard: rename hosted project "Innsights AI" → "Lodgic" (Project Settings → General; cosmetic, no ref/URL change)
 
 ## 4. DNS (jonhammond.org)
 
-- [ ] Add CNAME `lodgic` → `cname.vercel-dns.com` (or the value Vercel shows)
-- [ ] Leave `innsights` CNAME in place while the redirect is wanted
-- [ ] `dig +short lodgic.jonhammond.org` resolves; `curl -sI https://lodgic.jonhammond.org | head -1` returns 200
+- [x] Add CNAME `lodgic` → `cname.vercel-dns.com` (or the value Vercel shows)
+- [x] Leave `innsights` CNAME in place while the redirect is wanted
+- [x] `dig +short lodgic.jonhammond.org` resolves; `curl -sI https://lodgic.jonhammond.org | head -1` returns 200
 
 ## 5. Portfolio (`~/Code/jonhammond.github.io`)
 
