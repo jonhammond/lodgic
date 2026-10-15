@@ -29,12 +29,16 @@ type Role = "label" | "heat" | "bar";
 const CURRENCY_RE = /revenue|adr|revpar|price|rate_usd/i;
 // Totals heuristic: additive metrics are summed, everything else (ADR, occupancy, ...) is averaged.
 const SUM_RE = /revenue|rooms_sold|rooms|count|total/i;
+// Grouped results list one row per property; the raw `name` key reads better as "Property".
+const LABEL_OVERRIDES: Record<string, string> = { name: "Property", property_name: "Property", property: "Property" };
 
 const FLEX_BY_ROLE: Record<Role, number> = { label: 1.1, bar: 1.3, heat: 0.7 };
+// Fixed value slots so the numbers form a column under the header and the bar starts at one x.
+const VALUE_W = { currency: 84, count: 64 } as const;
+const slotOf = (c: string) => (CURRENCY_RE.test(c) ? VALUE_W.currency : VALUE_W.count);
 
 export function PropertyTable({ title, columns: inputColumns, rows, groupBy, seriesOrder }: Props) {
   const { t, wide } = useTheme();
-  const barColors = [t.table.revenueBar, t.table.adrBar, t.accent.violet];
 
   const labelCol = inputColumns.find((c) =>
     rows.some((r) => r[c] != null && !isNumeric(r[c])),
@@ -109,7 +113,12 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
 
   const flexOf = (i: number) => FLEX_BY_ROLE[roles[columns[i]]];
   const isLast = (i: number) => i === columns.length - 1;
-  const alignOf = (i: number) => (isLast(i) ? ("right" as const) : ("left" as const));
+  // Bar columns are value-then-bar, so their header sits over the value slot on the left;
+  // only a trailing heat column right-aligns.
+  const alignOf = (i: number) =>
+    isLast(i) && roles[columns[i]] === "heat" ? ("right" as const) : ("left" as const);
+  const headerOf = (c: string) =>
+    (groupBy && roles[c] === "label" && LABEL_OVERRIDES[c.toLowerCase()]) || humanize(c);
 
   const money = (c: string, v: number) =>
     !CURRENCY_RE.test(c)
@@ -118,13 +127,20 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
         ? formatCompactCurrency(v)
         : formatCurrency(v);
 
-  const totalFor = (c: string): string => {
-    const v = nums(c);
-    if (v.length === 0) return "";
-    const sum = v.reduce((a, x) => a + x, 0);
-    const val = SUM_RE.test(c) ? sum : sum / v.length;
-    return roles[c] === "heat" ? formatPercent(val) : money(c, val);
+  const aggregate = (c: string, vals: number[]): string => {
+    if (vals.length === 0) return "";
+    const sum = vals.reduce((a, x) => a + x, 0);
+    const summed = SUM_RE.test(c);
+    const val = summed ? sum : sum / vals.length;
+    const text = roles[c] === "heat" ? formatPercent(val) : money(c, val);
+    return summed ? text : `avg ${text}`;
   };
+  const totalFor = (c: string) => aggregate(c, nums(c));
+  const subtotalFor = (c: string, rs: Record<string, unknown>[]) =>
+    aggregate(
+      c,
+      rs.filter((r) => isNumeric(r[c])).map((r) => toNumber(r[c])),
+    );
 
   const cell = (c: string, i: number, r: Record<string, unknown>) => {
     const rampColor =
@@ -156,35 +172,44 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
       );
     }
     const pct = colMax[c] > 0 ? (v / colMax[c]) * 100 : 0;
+    // One coloured bar per row: the lead metric takes the property ramp colour (same as the
+    // trend chart); every later bar column is the thin grey volume bar the combo chart uses.
+    const lead = barIdx[c] === 0;
+    const color = lead ? (rampColor ?? t.table.adrBar) : t.trend.volumeActive;
+    const size = lead ? styles.barTall : styles.barThin;
     return (
       <View key={c} style={style}>
         <View style={styles.barCell}>
-          <View style={styles.barTrack}>
-            <View
-              style={[
-                styles.bar,
-                { width: `${pct}%`, backgroundColor: (barIdx[c] === 0 ? rampColor : undefined) ?? barColors[barIdx[c] % barColors.length] },
-              ]}
-            />
-          </View>
-          <Text numberOfLines={1} style={[styles.text, styles.barText, { color: t.text.primary }]}>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.text,
+              styles.barValue,
+              { width: slotOf(c), color: t.text.primary },
+            ]}
+          >
             {money(c, v)}
           </Text>
+          <View style={[styles.barTrack, size]}>
+            <View style={[size, { width: `${pct}%`, backgroundColor: color }]} />
+          </View>
         </View>
       </View>
     );
   };
 
-  const groupSummary = (rs: Record<string, unknown>[]): string => {
-    if (!firstBar) return "";
-    const vals = rs.filter((r) => isNumeric(r[firstBar]));
-    if (vals.length === 0) return "";
-    const avg = vals.reduce((a, r) => a + toNumber(r[firstBar]), 0) / vals.length;
-    const lead = vals[0];
-    const leadName = labelCol && lead[labelCol] != null ? String(lead[labelCol]).trim() : "";
-    // Narrow layouts (horizontal-scroll table) drop the leader so the header fits the 440px row.
-    const leader = wide && leadName ? ` \u00b7 \u25b2 ${leadName} ${money(firstBar, toNumber(lead[firstBar]))}` : "";
-    return `avg ${money(firstBar, avg)}${leader}`;
+  // Group header suffix (wide only, so the narrow scrolling layout keeps the date on one
+  // line): the row count while open, the leader while collapsed. Rows are sorted desc by `firstBar`.
+  const suffixFor = (rs: Record<string, unknown>[], open: boolean): string => {
+    if (!wide) return "";
+    if (open) {
+      const noun = labelCol && LABEL_OVERRIDES[labelCol.toLowerCase()] ? "properties" : "rows";
+      return `${rs.length} ${noun}`;
+    }
+    if (!firstBar || !labelCol) return "";
+    const lead = rs.find((r) => isNumeric(r[firstBar]));
+    const name = lead && lead[labelCol] != null ? String(lead[labelCol]).trim() : "";
+    return lead && name ? `${name} led at ${money(firstBar, toNumber(lead[firstBar]))}` : "";
   };
 
   return (
@@ -200,7 +225,7 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
             {columns.map((c, i) => (
               <View key={c} style={{ flex: flexOf(i) }}>
                 <Text style={[styles.headText, { color: t.text.secondary, textAlign: alignOf(i) }]}>
-                  {humanize(c)}
+                  {headerOf(c)}
                 </Text>
               </View>
             ))}
@@ -208,6 +233,7 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
           {groupBy
             ? groups.map((g) => {
                 const open = expanded.has(g.key);
+                const suffix = suffixFor(g.rows, open);
                 return (
                   <View key={g.key}>
                     <Pressable
@@ -219,7 +245,6 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                           .hovered;
                         return [
                           styles.groupHead,
-                          wide ? styles.groupHeadWide : styles.groupHeadNarrow,
                           {
                             backgroundColor: t.bg.panel,
                             borderBottomColor: hovered ? t.border.strongHover : t.border.strong,
@@ -227,16 +252,38 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                         ];
                       }}
                     >
-                      <Text style={[styles.text, { color: t.text.dim }]}>{open ? "\u25be" : "\u25b8"}</Text>
-                      <Text style={[styles.text, styles.bold, { color: t.text.primary }]}>
-                        {weekly ? formatWeekEnding(g.key) : formatLongDate(g.key)}
-                      </Text>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.groupSummary, wide && styles.groupSummaryWide, { color: t.text.secondary }]}
-                      >
-                        {groupSummary(g.rows)}
-                      </Text>
+                      {columns.map((c, i) =>
+                        i === 0 ? (
+                          <View key={c} style={[styles.cell, styles.groupLabel, { flex: flexOf(i) }]}>
+                            <Text style={[styles.text, { color: t.text.dim }]}>{open ? "▾" : "▸"}</Text>
+                            <Text style={[styles.text, styles.bold, styles.date, { color: t.text.primary }]}>
+                              {weekly ? formatWeekEnding(g.key) : formatLongDate(g.key)}
+                            </Text>
+                            {suffix ? (
+                              <Text
+                                numberOfLines={1}
+                                style={[styles.subtotal, styles.suffix, { color: t.text.secondary }]}
+                              >
+                                {suffix}
+                              </Text>
+                            ) : null}
+                          </View>
+                        ) : (
+                          <View key={c} style={[styles.cell, { flex: flexOf(i) }]}>
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.subtotal,
+                                { color: t.text.secondary },
+                                // Bar columns: same fixed slot as the row values so the digits line up.
+                                roles[c] === "bar" ? { width: slotOf(c), textAlign: "right" } : { textAlign: alignOf(i) },
+                              ]}
+                            >
+                              {subtotalFor(c, g.rows)}
+                            </Text>
+                          </View>
+                        ),
+                      )}
                     </Pressable>
                     {open &&
                       g.rows.map((r, ri) => (
@@ -272,17 +319,19 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
   );
 }
 
+const COL_GAP = 20;
+
 const styles = StyleSheet.create({
   card: { paddingTop: 16, paddingHorizontal: 18, paddingBottom: 10 },
   title: { fontFamily: fonts.sans700, fontSize: 13, marginBottom: 10 },
   scrollContent: { flexGrow: 1 },
-  inner: { minWidth: 440, flex: 1 },
-  headerRow: { flexDirection: "row", gap: 10, paddingVertical: 8, borderBottomWidth: 1 },
+  inner: { minWidth: 520, flex: 1 },
+  headerRow: { flexDirection: "row", gap: COL_GAP, paddingVertical: 8, borderBottomWidth: 1 },
   headText: { fontFamily: fonts.sans600, fontSize: 12 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: COL_GAP,
     paddingVertical: 9,
     borderBottomWidth: 1,
   },
@@ -290,22 +339,23 @@ const styles = StyleSheet.create({
   text: { fontFamily: fonts.sans400, fontSize: 13, ...tabular },
   bold: { fontFamily: fonts.sans700 },
   heat: { textAlign: "right", paddingVertical: 3, paddingHorizontal: 6, alignSelf: "flex-end" },
-  // Bar track and value share the cell side by side, so a 100% bar ends before the text.
+  // Value sits in a fixed slot on the left, the bar grows rightwards from it and ends in
+  // whitespace before the next column, so a number never touches a neighbouring bar.
   barCell: { height: 22, flexDirection: "row", alignItems: "center", gap: 8 },
-  barTrack: { flex: 1, height: 22, justifyContent: "center" },
-  bar: { height: 22 },
-  barText: { textAlign: "right", minWidth: 92 },
+  barValue: { textAlign: "right" },
+  barTrack: { flex: 1, justifyContent: "center" },
+  barTall: { height: 22 },
+  barThin: { height: 12 },
   groupHead: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: COL_GAP,
     paddingVertical: 8,
-    paddingHorizontal: 4,
     borderBottomWidth: 1,
   },
-  groupHeadWide: { flexWrap: "nowrap" },
-  groupHeadNarrow: { flexWrap: "wrap" },
-  groupSummary: { fontFamily: fonts.mono400, fontSize: 11, ...tabular, flexShrink: 1 },
-  groupSummaryWide: { marginLeft: "auto" },
-  totalRow: { flexDirection: "row", gap: 10, paddingTop: 10, paddingBottom: 6 },
+  groupLabel: { flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 8 },
+  date: { flexShrink: 0 },
+  subtotal: { fontFamily: fonts.sans400, fontSize: 12, ...tabular },
+  suffix: { flexShrink: 1 },
+  totalRow: { flexDirection: "row", gap: COL_GAP, paddingTop: 10, paddingBottom: 6 },
 });
