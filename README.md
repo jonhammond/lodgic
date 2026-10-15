@@ -1,8 +1,8 @@
-# innsights-ai
+# lodgic
 
 Hospitality analytics demo: ask natural-language questions about a synthetic hotel portfolio; Gemini 3.5 Flash-Lite converts them to SQL, Supabase executes them read-only, and a dashboard renders live KPI tiles (with sparklines), charts, and tables.
 
-Live demo: https://innsights.jonhammond.org
+Live demo: https://lodgic.jonhammond.org
 
 ## Stack
 

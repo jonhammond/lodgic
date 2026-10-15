@@ -62,7 +62,7 @@ type Action =
   | { type: "CLOSE_PICKER" }
   | { type: "RESET_RATE_LIMIT" };
 
-const STORAGE_KEY = "innsights.properties";
+const STORAGE_KEY = "lodgic.properties";
 
 function readStoredSelection(): Set<string> | null {
   const raw = readStored(STORAGE_KEY);

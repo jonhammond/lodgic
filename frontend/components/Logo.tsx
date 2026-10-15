@@ -2,10 +2,10 @@ import Svg, { Defs, LinearGradient, Polyline, Rect, Stop } from "react-native-sv
 
 type Props = { size?: number };
 
-/** InnSights mark: roofline over ascending bars. Source of truth: assets/logo.svg. */
+/** Lodgic mark: roofline over ascending bars. Source of truth: assets/logo.svg. */
 export function Logo({ size = 30 }: Props) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 64 64" accessibilityLabel="InnSights">
+    <Svg width={size} height={size} viewBox="0 0 64 64" accessibilityLabel="Lodgic">
       <Defs>
         <LinearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#ee4a6e" />

@@ -3,7 +3,7 @@ import { useColorScheme, useWindowDimensions } from "react-native";
 import { readStored, writeStored } from "../lib/storage";
 import { dark, light, Palette, space } from "./tokens";
 
-const STORAGE_KEY = "innsights.theme";
+const STORAGE_KEY = "lodgic.theme";
 
 type Scheme = "dark" | "light";
 type ThemeValue = {

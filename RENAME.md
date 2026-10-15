@@ -7,13 +7,13 @@ Order matters: deploy target + DNS first, portfolio merge last.
 
 - [x] `frontend/app.json`: `"name": "Lodgic"`, `"slug": "lodgic"`
 - [x] `frontend/components/Header.tsx:33`: wordmark text `InnSights` → `Lodgic`
-- [ ] `frontend/components/Logo.tsx`: comment + `accessibilityLabel` → `Lodgic`; redraw `assets/logo.svg` if the roofline mark should change
-- [ ] `frontend/App.tsx:65`: `STORAGE_KEY` `innsights.properties` → `lodgic.properties` (resets saved property selections for existing users; acceptable for a demo)
-- [ ] `frontend/theme/useTheme.ts:6`: `STORAGE_KEY` `innsights.theme` → `lodgic.theme`
-- [ ] `README.md`: title `# lodgic`, live-demo URL → `https://lodgic.jonhammond.org`
-- [ ] `.serena/project.yml`: `project_name: "lodgic"`
-- [ ] `supabase/config.toml`: `project_id = "lodgic"` (local CLI label only; hosted project unaffected)
-- [ ] `grep -rniE innsight --exclude-dir=node_modules --exclude-dir=.git .` → empty
+- [x] `frontend/components/Logo.tsx`: comment + `accessibilityLabel` → `Lodgic`; redraw `assets/logo.svg` if the roofline mark should change
+- [x] `frontend/App.tsx:65`: `STORAGE_KEY` `innsights.properties` → `lodgic.properties` (resets saved property selections for existing users; acceptable for a demo)
+- [x] `frontend/theme/useTheme.ts:6`: `STORAGE_KEY` `innsights.theme` → `lodgic.theme`
+- [x] `README.md`: title `# lodgic`, live-demo URL → `https://lodgic.jonhammond.org`
+- [x] `.serena/project.yml`: `project_name: "lodgic"`
+- [x] `supabase/config.toml`: `project_id = "lodgic"` (local CLI label only; hosted project unaffected)
+- [x] `grep -rniE innsight --exclude-dir=node_modules --exclude-dir=.git .` → empty (tracked files clean; remaining hits are ignored build/cache dirs: `frontend/dist`, `frontend/.expo`, `supabase/.temp`, `.remember`)
 - [ ] Commit on a branch, merge, push
 
 ## 2. GitHub
@@ -28,6 +28,7 @@ Order matters: deploy target + DNS first, portfolio merge last.
 - [ ] Domains: add `lodgic.jonhammond.org`
 - [ ] Keep `innsights.jonhammond.org` attached and set it to redirect (308) to `lodgic.jonhammond.org`, or remove it once nothing links to it
 - [ ] Redeploy; confirm wordmark + tab title read Lodgic
+- [ ] Supabase dashboard: rename hosted project "Innsights AI" → "Lodgic" (Project Settings → General; cosmetic, no ref/URL change)
 
 ## 4. DNS (jonhammond.org)
 
