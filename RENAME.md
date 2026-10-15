@@ -5,8 +5,8 @@ Order matters: deploy target + DNS first, portfolio merge last.
 
 ## 1. App repo (`~/Code/innsights-ai`)
 
-- [ ] `frontend/app.json`: `"name": "Lodgic"`, `"slug": "lodgic"`
-- [ ] `frontend/components/Header.tsx:33`: wordmark text `InnSights ` → `Lodgic `
+- [x] `frontend/app.json`: `"name": "Lodgic"`, `"slug": "lodgic"`
+- [x] `frontend/components/Header.tsx:33`: wordmark text `InnSights` → `Lodgic`
 - [ ] `frontend/components/Logo.tsx`: comment + `accessibilityLabel` → `Lodgic`; redraw `assets/logo.svg` if the roofline mark should change
 - [ ] `frontend/App.tsx:65`: `STORAGE_KEY` `innsights.properties` → `lodgic.properties` (resets saved property selections for existing users; acceptable for a demo)
 - [ ] `frontend/theme/useTheme.ts:6`: `STORAGE_KEY` `innsights.theme` → `lodgic.theme`

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Innsights",
-    "slug": "innsights",
+    "name": "Lodgic",
+    "slug": "lodgic",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

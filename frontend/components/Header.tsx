@@ -30,7 +30,7 @@ export function Header({
   return (
     <View style={styles.row}>
       <Text accessibilityRole="header" style={[styles.title, { color: t.text.primary }]}>
-        <Text style={{ fontFamily: fonts.sans700 }}>InnSights </Text>
+        <Text style={{ fontFamily: fonts.sans700 }}>Lodgic </Text>
         <Text style={{ fontFamily: fonts.sans400 }}>| Portfolio Dashboard</Text>
       </Text>
       <View style={styles.right}>
