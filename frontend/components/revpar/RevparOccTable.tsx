@@ -54,11 +54,11 @@ export function RevparOccTable({ rows, portfolio, sort, onSort }: RevparOccTable
     );
   };
 
-  const value = (k: SortKey, r: Pick<PropertyCalc, "rooms" | "roomsSold" | "roomsAvailable" | "adr" | "revpar">) =>
+  const value = (k: SortKey, r: Pick<PropertyCalc, "rooms" | "occupancy" | "adr" | "revpar">) =>
     k === "rooms"
       ? formatNumber(r.rooms)
       : k === "occupancy"
-        ? formatPercent((r.roomsAvailable > 0 ? r.roomsSold / r.roomsAvailable : 0) * 100)
+        ? formatPercent(r.occupancy * 100)
         : k === "adr"
           ? formatCurrency(r.adr)
           : formatCurrency(r.revpar);

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { VictoryAxis, VictoryBar, VictoryChart, VictoryContainer, VictoryLabel, VictoryLine } from "victory";
 import { PropertyCalc } from "../../lib/revparEngine";
-import { fonts, tabular } from "../../theme/tokens";
+import { fonts } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { formatCurrency, formatPercent } from "./format";
@@ -37,7 +37,7 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
   // Victory draws x=1 at the bottom of a horizontal chart; invert so row 0 is on top.
   const x = (i: number) => n - i;
   const revData = rows.map((r, i) => ({ x: x(i), y: r.revpar, tier: r.tier }));
-  const occData = rows.map((r, i) => ({ x: x(i), y: r.roomsAvailable > 0 ? r.roomsSold / r.roomsAvailable : 0 }));
+  const occData = rows.map((r, i) => ({ x: x(i), y: r.occupancy }));
   const targetData = [
     { x: 0.5, y: target },
     { x: n + 0.5, y: target },
@@ -90,12 +90,6 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
 
   return (
     <Card style={styles.card}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>RevPAR and occupancy by property</Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>
-          {`Target ${formatCurrency(target)} (portfolio RevPAR)`}
-        </Text>
-      </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={stacked ? undefined : styles.panels}>
         {width > 0 && n > 0 && (
           <>
@@ -172,16 +166,6 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
 
 const styles = StyleSheet.create({
   card: { paddingTop: 16, paddingHorizontal: 18, paddingBottom: 14 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    flexWrap: "wrap",
-    gap: 4,
-    marginBottom: 14,
-  },
-  title: { fontFamily: fonts.sans700, fontSize: 13 },
-  note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
   panels: { flexDirection: "row" },
   legend: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },

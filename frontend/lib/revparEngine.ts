@@ -14,7 +14,7 @@ export type PropertyBase = {
   id: string;
   name: string;
   rooms: number;
-  /** 0..1 */
+  /** 0..1. On a PropertyCalc this is post-shift (clamped at 1). */
   occupancy: number;
   adr: number;
   /** Rows used in the window. */
@@ -90,7 +90,7 @@ export function compute(
     const roomsAvailable = p.rooms * mult;
     const roomsSold = roomsAvailable * occ;
     const revenue = roomsSold * p.adr;
-    return { ...p, roomsAvailable, roomsSold, revenue, revpar: ratio(revenue, roomsAvailable) };
+    return { ...p, occupancy: occ, roomsAvailable, roomsSold, revenue, revpar: ratio(revenue, roomsAvailable) };
   });
   const sum = (f: (l: (typeof lines)[number]) => number) => lines.reduce((a, l) => a + f(l), 0);
   const roomsAvailable = sum((l) => l.roomsAvailable);

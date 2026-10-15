@@ -63,6 +63,8 @@ test("demand shift clamps occupancy at 100%", () => {
   const { rows } = compute(base, "daily", 1.5);
   assert.equal(rows[0].roomsSold, 100);
   assert.equal(rows[0].revpar, 100);
+  assert.equal(rows[0].occupancy, 1);
+  assert.equal(compute(base, "daily", 1.1).rows[0].occupancy, 0.8 * 1.1);
 });
 
 test("zero sales gives ADR 0 and no NaN", () => {
