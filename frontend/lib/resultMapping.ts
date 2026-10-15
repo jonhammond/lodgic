@@ -91,6 +91,12 @@ export function isAdditiveKey(key: string): boolean {
   return /revenue|cost|gop|rooms_sold|bookings|cancellations|rooms_cleaned|hours/i.test(key) && u !== "percent" && u !== "index";
 }
 
+/** Full-precision variant for places that replace a table: currency keeps cents, no compacting. */
+export function formatExact(v: number, unit: MetricUnit): string {
+  if (unit === "currency") return formatCurrency(v);
+  return formatByUnit(v, unit);
+}
+
 export function formatByUnit(v: number, unit: MetricUnit): string {
   if (unit === "percent") return formatPercent(v);
   if (unit === "currency") return Math.abs(v) >= 1000 ? formatCompactCurrency(v) : formatCurrency(v);
@@ -395,7 +401,9 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         ? `${title}: ${formatByUnit(c.values.reduce((a, b) => a + b, 0), c.unit)}`
         : `${title}: ${c.labels[0]} \u2014 ${formatByUnit(c.values[0], c.unit)}`;
     }
-    return { headline, facts: categoryFacts(charts[0], xKey), charts, table: tableOf() };
+    // A single-metric category chart carries exact labels and the total itself; a table would repeat it row for row.
+    const table = charts.length === 1 ? null : tableOf();
+    return { headline, facts: categoryFacts(charts[0], xKey), charts, table };
   }
 
   return { headline: title, facts: tableFacts(rows), charts: [], table: tableOf() };

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { VictoryAxis, VictoryBar, VictoryChart, VictoryLabel } from "victory";
-import { formatByUnit, MetricSeries } from "../../lib/resultMapping";
+import { formatByUnit, formatExact, isAdditiveKey, MetricSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
@@ -53,7 +53,11 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
   const names = labels.map((l) => wrapLabel(l ?? "", layout.chars));
   const wrapped = names.some((s) => s.includes("\n"));
   const rowH = wrapped ? ROW_H_WRAPPED : ROW_H;
-  const valueText = values.map((v) => formatByUnit(v, unit));
+  // Wide layouts stand in for the table: exact values. Narrow keeps compact labels so the track stays usable.
+  const fmt = narrow ? formatByUnit : formatExact;
+  const valueText = values.map((v) => fmt(v, unit));
+  const total = isAdditiveKey(series.key) ? values.reduce((a, b) => a + b, 0) : null;
+  const note = total === null ? series.note : `Total ${formatExact(total, unit)} \u00b7 ${series.note}`;
   // Reserve the right gutter for the widest value label so the longest bar never runs under it.
   const valueW = Math.max(0, ...valueText.map((s) => s.length)) * VALUE_CHAR_W + 12;
   const pad = { top: 6, bottom: 22, left: layout.left, right: Math.ceil(valueW) };
@@ -66,7 +70,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
     <Card style={styles.card}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: t.text.primary }]}>{series.title}</Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>{series.note}</Text>
+        <Text style={[styles.note, { color: t.text.subtle }]}>{note}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 && n > 0 && (
@@ -111,7 +115,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
               data={data}
               barWidth={BAR_W}
               cornerRadius={{ top: 2 }}
-              labels={({ datum }) => formatByUnit(datum.y, unit)}
+              labels={({ datum }) => fmt(datum.y, unit)}
               labelComponent={<VictoryLabel dx={4} textAnchor="start" />}
               style={{
                 data: {
