@@ -50,7 +50,11 @@ const RESPONSE_SCHEMA = {
 const SUMMARY_TIMEOUT_MS = 8_000;
 
 class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -69,7 +73,7 @@ function corsHeaders(origin: string | null): Record<string, string> {
     "Access-Control-Allow-Headers":
       "authorization, apikey, content-type, x-client-info",
     "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
   if (origin && allowedOrigins().includes(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
@@ -105,9 +109,8 @@ function errorResponse(
 async function hashIp(ip: string, salt: string): Promise<string> {
   const data = new TextEncoder().encode(`${salt}:${ip}`);
   const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(
-    new Uint8Array(digest),
-    (b) => b.toString(16).padStart(2, "0"),
+  return Array.from(new Uint8Array(digest), (b) =>
+    b.toString(16).padStart(2, "0"),
   ).join("");
 }
 
@@ -302,10 +305,13 @@ async function handle(
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const salt = Deno.env.get("IP_HASH_SALT");
-  const geminiModel = Deno.env.get("GEMINI_MODEL")?.trim() ||
-    DEFAULT_GEMINI_MODEL;
-  const geminiFallbackModel = Deno.env.get("GEMINI_FALLBACK_MODEL")?.trim() ??
+  const geminiModel =
+    Deno.env.get("GEMINI_MODEL")?.trim() || DEFAULT_GEMINI_MODEL;
+  const geminiFallbackModel =
+    Deno.env.get("GEMINI_FALLBACK_MODEL")?.trim() ??
     DEFAULT_GEMINI_FALLBACK_MODEL;
+  console.info("Using Gemini model:", geminiModel);
+  console.info("Using Gemini fallback model:", geminiFallbackModel);
   if (!supabaseUrl || !serviceKey || !geminiKey || !salt) {
     console.error("missing required environment configuration");
     throw new ApiError(500, "server_misconfigured", "Server is not configured");
