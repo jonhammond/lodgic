@@ -90,33 +90,29 @@ test("portfolio is room-weighted ratios of sums", () => {
 });
 
 test("tier cut-offs", () => {
-  // target = (100*a + 100*b + 100*c) / 300 revpar with occ 1
-  const base: PropertyBase[] = [
-    { id: "hi", name: "hi", rooms: 100, occupancy: 1, adr: 120, days: 1 },
-    { id: "mid", name: "mid", rooms: 100, occupancy: 1, adr: 90, days: 1 },
-    { id: "lo", name: "lo", rooms: 100, occupancy: 1, adr: 90, days: 1 },
-  ];
-  // target = 100; mid at 90 -> below (>= 85)
-  const t = (id: string, adr: number) => {
-    const b = base.map((p) => (p.id === id ? { ...p, adr } : p));
-    return compute(b, "daily", 1).rows.find((r) => r.id === id)!.tier;
-  };
-  assert.equal(compute(base, "daily", 1).rows[0].tier, "above");
-  assert.equal(compute(base, "daily", 1).rows[1].tier, "below");
-  // exactly at target
-  const eq = compute([{ ...base[0], adr: 100 }, { ...base[1], adr: 100 }], "daily", 1);
-  assert.equal(eq.rows[0].tier, "above");
-  // exactly 0.85 * target is below, not critical
-  const edge = compute(
-    [
-      { id: "x", name: "x", rooms: 100, occupancy: 1, adr: 85, days: 1 },
-      { id: "y", name: "y", rooms: 100, occupancy: 1, adr: 115, days: 1 },
-    ],
-    "daily",
-    1,
-  );
-  assert.equal(edge.rows[0].tier, "below");
-  assert.equal(t("lo", 50), "critical");
+  const prop = (id: string, adr: number): PropertyBase => ({
+    id,
+    name: id,
+    rooms: 100,
+    occupancy: 1,
+    adr,
+    days: 1,
+  });
+  const tiers = (...adrs: number[]) =>
+    compute(adrs.map((a, i) => prop(String(i), a)), "daily", 1).rows.map((r) => r.tier);
+  // target = 100: above, below (>= 0.85 * target), critical (< 0.85 * target)
+  assert.deepEqual(tiers(140, 90, 70), ["above", "below", "critical"]);
+  // revpar exactly at target is above
+  assert.deepEqual(tiers(100, 100), ["above", "above"]);
+  // revpar exactly 0.85 * target is below, not critical
+  assert.deepEqual(tiers(85, 115), ["below", "above"]);
+});
+
+test("daysUsed is the max days across properties", () => {
+  const rows = [mk("a", "2026-01-01", 10, 1000), mk("a", "2026-01-02", 10, 1000), mk("b", "2026-01-02", 10, 1000)];
+  const base = baseInputs(rows, props, "ytd", "2026-01-02");
+  assert.deepEqual(base.map((p) => p.days), [2, 1]);
+  assert.equal(compute(base, "ytd", 1).daysUsed, 2);
 });
 
 test("sortRows for every key and direction with stable ties", () => {

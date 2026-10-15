@@ -44,8 +44,6 @@ export type Portfolio = {
 
 export type SortKey = "revpar" | "occupancy" | "adr" | "rooms" | "name";
 
-const WINDOW: Record<Timeframe, number> = { daily: 1, mtd: 30, ytd: 365 };
-
 export function baseInputs(
   rows: DailyRow[],
   properties: { id: string; name: string; total_rooms: number }[],
@@ -56,7 +54,7 @@ export function baseInputs(
     .filter((d) => d <= latestDate)
     .sort()
     .reverse();
-  const window = new Set(timeframe === "daily" ? [latestDate] : distinct.slice(0, WINDOW[timeframe]));
+  const window = new Set(timeframe === "daily" ? [latestDate] : distinct.slice(0, DAYS[timeframe]));
   return properties.map((p) => {
     let sold = 0;
     let revenue = 0;
