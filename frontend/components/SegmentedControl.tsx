@@ -5,7 +5,7 @@ import { useTheme } from "../theme/useTheme";
 export type SegmentedControlProps<K extends string> = {
   label: string;
   options: { key: K; label: string }[];
-  value: K;
+  value: K | null;
   onChange: (k: K) => void;
 };
 

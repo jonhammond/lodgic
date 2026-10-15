@@ -132,7 +132,7 @@ Validate with the dataviz script before committing:
 2. `RangeSlider.tsx`: `react-native-web` ships no type declarations, so do not import `unstable_createElement`. On `Platform.OS === "web"` render a plain `<input type="range">` JSX element (typed by the DOM lib + `@types/react`; react-native-web renders raw DOM children). Non-web fallback stays `−`/`+` buttons.
 3. `App.tsx`: `SUBMIT` clears `panel` (not only `SUCCESS`) so loading/error states in `AnswerCard` are visible after leaving the panel.
 4. `App.tsx`: the flash (`resultSeq`) and scroll-to-result effect key on `result ?? panel` so opening the panel flashes and scrolls like a query result.
-5. `RevparOccTable.tsx`: below `space.breakpoint` hide the Rooms column and render Tier as the coloured dot only (columns: Property, Occupancy, ADR, RevPAR, ●). Footer row follows.
+5. `RevparOccTable.tsx`: below `space.breakpoint` hide the Rooms column and render Tier as the coloured dot only (columns: Property, Occ, RevPAR, ●; ADR is dropped at narrow widths). Footer row follows.
 6. Palette validation: load the `dataviz` skill and run its `validate_palette.js` (do not hard-code the plugin temp path).
 7. Timeframe labels: control reads "Daily" / "30 days" / "Annualised"; subtitle reads "Latest day (<date>)" / "Last 30 days" / "Annualised from N days of data". Engine keys stay `daily | mtd | ytd`. CSV filename uses the key.
 
@@ -154,6 +154,6 @@ Execution per model-handoff: steps 1–7 as Sonnet executor subagents (1→2→3
 
 - `cd frontend && npx tsc --noEmit && npx expo lint && npm test` (the PostToolUse hook also runs tsc + eslint on every edit).
 - Palette validator passes for the tier triple in both modes.
-- Manual, with `npx expo start --web` on :8081: press the chip → panel renders without a network call to the Edge Function (check Network tab); switch Daily/MTD/YTD → rooms available = rooms × 1/30/365 in the footer; slider to 120% → occupancy rises, capped at 100%, cards show "+x% vs baseline"; sort by Occupancy → chart rows and table reorder together; header click toggles direction; deselect properties in the picker → chart, cards, and table shrink to the selection; Export downloads the leaderboard CSV.
+- Manual, with `npx expo start --web` on :8081: press the chip → panel renders without a network call to the Edge Function (check Network tab); switch Daily/MTD/YTD → room-nights in the headline = rooms × 1/30/365; slider to 120% → occupancy rises, capped at 100%, cards show "+x% vs baseline"; sort by Occupancy → chart rows and table reorder together; header click toggles direction; deselect properties in the picker → chart, cards, and table shrink to the selection; Export downloads the leaderboard CSV.
 - `chart-reviewer` agent on "RevPAR vs occupancy" at desktop and 390px widths, light and dark: no label collisions at the bar ends, name axis wraps to ≤2 lines, legend and target line legible.
 - Regression: another preset (e.g. "ADR by property, last 30 days") still routes through Gemini and renders as before; `/prompt-regress` unchanged.

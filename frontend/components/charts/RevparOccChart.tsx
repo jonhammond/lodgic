@@ -117,10 +117,11 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
     paintOrder: "stroke",
   };
 
-  const legend: { color: string; text: string }[] = [
+  const legend: { color: string; text: string; dashed?: boolean }[] = [
     { color: t.tier.above, text: "Above target" },
     { color: t.tier.below, text: "Below target" },
     { color: t.tier.critical, text: "Critical (<85% of target)" },
+    { color: t.text.secondary, text: `Portfolio target ${formatCurrency(target)}`, dashed: true },
   ];
 
   return (
@@ -216,7 +217,13 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
       <View style={styles.legend}>
         {legend.map((l) => (
           <View key={l.text} style={styles.legendItem}>
-            <View style={[styles.swatch, { backgroundColor: l.color }]} />
+            <View
+              style={
+                l.dashed
+                  ? [styles.dash, { borderTopColor: l.color }]
+                  : [styles.swatch, { backgroundColor: l.color }]
+              }
+            />
             <Text style={[styles.legendText, { color: t.text.secondary }]}>
               {l.text}
             </Text>
@@ -233,5 +240,6 @@ const styles = StyleSheet.create({
   legend: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   swatch: { width: 10, height: 10, borderRadius: 2 },
+  dash: { width: 14, height: 0, borderTopWidth: 2, borderStyle: "dashed" },
   legendText: { fontFamily: fonts.sans400, fontSize: 11 },
 });

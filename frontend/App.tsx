@@ -47,6 +47,7 @@ type State = {
   errorMessage: string | null;
   result: QueryResult | null;
   panel: "revparOcc" | null;
+  panelSeq: number;
   sqlOpen: boolean;
   kpis: { status: "loading" | "ready" | "error"; data: KpiSnapshot | null };
   properties: Property[];
@@ -90,6 +91,7 @@ const initial: State = {
   errorMessage: null,
   result: null,
   panel: null,
+  panelSeq: 0,
   sqlOpen: false,
   kpis: { status: "loading", data: null },
   properties: [],
@@ -105,7 +107,7 @@ function reducer(s: State, a: Action): State {
     case "SUBMIT":
       return { ...s, status: "loading", errorMessage: null, panel: null };
     case "OPEN_PANEL":
-      return { ...s, status: "idle", errorMessage: null, result: null, panel: "revparOcc" };
+      return { ...s, status: "idle", errorMessage: null, result: null, panel: "revparOcc", panelSeq: s.panelSeq + 1 };
     case "SUCCESS":
       return { ...s, status: "idle", errorMessage: null, result: a.result, panel: null };
     case "FAIL":
@@ -177,7 +179,7 @@ function AppInner() {
     IBMPlexMono_500Medium,
   });
   const [state, dispatch] = useReducer(reducer, initial);
-  const { question, status, errorMessage, result, panel, sqlOpen, kpis } = state;
+  const { question, status, errorMessage, result, panel, panelSeq, sqlOpen, kpis } = state;
   const [panelExport, setPanelExport] = useState<{
     rows: Record<string, unknown>[];
     filename: string;
@@ -227,9 +229,12 @@ function AppInner() {
   const [resultSeq, setResultSeq] = useState(0);
   // Bump the flash key during render when a new result arrives (no effect-driven setState).
   const shown = result ?? panel;
+  const shownKey = `${panelSeq}`;
   const [prevShown, setPrevShown] = useState(shown);
-  if (shown !== prevShown) {
+  const [prevSeq, setPrevSeq] = useState(shownKey);
+  if (shown !== prevShown || shownKey !== prevSeq) {
     setPrevShown(shown);
+    setPrevSeq(shownKey);
     if (shown) setResultSeq((s) => s + 1);
   }
   useEffect(() => {
@@ -238,7 +243,7 @@ function AppInner() {
       scrollRef.current?.scrollTo({ y: Math.max(0, resultY.current - 12), animated: true }),
     );
     return () => cancelAnimationFrame(id);
-  }, [shown]);
+  }, [shown, panelSeq]);
 
   if (!fontsLoaded) {
     return <View style={{ flex: 1, backgroundColor: t.bg.page }} />;
@@ -318,6 +323,7 @@ function AppInner() {
         >
           {panel ? (
             <RevparOccPanel
+              key={panelSeq}
               properties={properties}
               selectedIds={selectedIds}
               onRowsChange={onPanelRows}

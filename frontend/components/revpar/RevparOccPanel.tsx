@@ -14,8 +14,9 @@ import {
 import { Property } from "../../lib/properties";
 import { fonts, space } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
-import { formatCurrency, formatPercent } from "../charts/format";
+import { formatCurrency, formatNumber, formatPercent } from "../charts/format";
 import { RevparOccChart } from "../charts/RevparOccChart";
+import { Button } from "../Button";
 import { RangeSlider } from "../RangeSlider";
 import { SegmentedControl } from "../SegmentedControl";
 import { Skeleton } from "../Skeleton";
@@ -82,6 +83,7 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
   const [timeframe, setTimeframe] = useState<Timeframe>("mtd");
   const [sort, setSort] = useState<Sort>({ key: "revpar", dir: "desc" });
   const [demandShift, setDemandShift] = useState(1);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +100,7 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const selected = useMemo(
     () => properties.filter((p) => selectedIds.has(p.id)),
@@ -106,14 +108,21 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
   );
   const ready = data.status === "ready" ? data : null;
 
+  const base = useMemo(
+    () =>
+      ready && ready.latestDate !== "" && selected.length > 0
+        ? baseInputs(ready.rows, selected, timeframe, ready.latestDate)
+        : null,
+    [ready, selected, timeframe],
+  );
+
   const calc = useMemo(() => {
-    if (!ready || ready.latestDate === "" || selected.length === 0) return null;
-    const base = baseInputs(ready.rows, selected, timeframe, ready.latestDate);
+    if (!base) return null;
     const cur = compute(base, timeframe, demandShift);
     const baseline: Portfolio | null =
       demandShift !== 1 ? compute(base, timeframe, 1).portfolio : null;
     return { ...cur, baseline };
-  }, [ready, selected, timeframe, demandShift]);
+  }, [base, timeframe, demandShift]);
 
   const sorted = useMemo(
     () => (calc ? sortRows(calc.rows, sort.key, sort.dir) : []),
@@ -130,9 +139,12 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
 
   const csvRows = useMemo<Record<string, unknown>[]>(() => {
     if (!calc || sorted.length === 0) return [];
-    const line = (property: string, rooms: number, occ: number, adr: number, revpar: number, tier: string) => ({
+    const line = (property: string, rooms: number, avail: number, sold: number, rev: number, occ: number, adr: number, revpar: number, tier: string) => ({
       property,
       rooms,
+      rooms_available: avail,
+      rooms_sold: Math.round(sold),
+      revenue: Number(rev.toFixed(2)),
       occupancy_pct: Number((occ * 100).toFixed(1)),
       adr: Number(adr.toFixed(2)),
       revpar: Number(revpar.toFixed(2)),
@@ -140,18 +152,19 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
     });
     const p = calc.portfolio;
     return [
-      ...sorted.map((r) => line(r.name, r.rooms, r.occupancy, r.adr, r.revpar, r.tier)),
-      line("Portfolio", p.rooms, p.occupancy, p.adr, p.revpar, ""),
+      ...sorted.map((r) => line(r.name, r.rooms, r.roomsAvailable, r.roomsSold, r.revenue, r.occupancy, r.adr, r.revpar, r.tier)),
+      line("Portfolio", p.rooms, p.roomsAvailable, p.roomsSold, p.revenue, p.occupancy, p.adr, p.revpar, ""),
     ];
   }, [calc, sorted]);
 
   useEffect(() => {
-    onRowsChange(csvRows, csvRows.length > 0 ? `revpar-vs-occupancy-${timeframe}.csv` : "");
-  }, [csvRows, timeframe, onRowsChange]);
+    const scenario = demandShift !== 1 ? `-demand${Math.round(demandShift * 100)}` : "";
+    onRowsChange(csvRows, csvRows.length > 0 ? `revpar-vs-occupancy-${timeframe}${scenario}.csv` : "");
+  }, [csvRows, timeframe, demandShift, onRowsChange]);
   useEffect(() => () => onRowsChange([], ""), [onRowsChange]);
 
   const onSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }));
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: key === "name" ? "asc" : "desc" }));
 
   if (data.status === "loading") {
     return (
@@ -163,7 +176,20 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
     );
   }
   if (data.status === "error") {
-    return <Text style={[styles.body, { color: t.delta.error }]}>{data.message}</Text>;
+    return (
+      <View style={styles.col}>
+        <Text style={[styles.body, { color: t.delta.error }]}>{data.message}</Text>
+        <View style={styles.retry}>
+          <Button
+            label="Retry"
+            onPress={() => {
+              setData({ status: "loading" });
+              setAttempt((a) => a + 1);
+            }}
+          />
+        </View>
+      </View>
+    );
   }
 
   const subtitle =
@@ -187,7 +213,7 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
       </Text>
       {calc ? (
         <Text style={[styles.body, { color: t.text.secondary }]}>
-          {`Portfolio RevPAR ${formatCurrency(calc.portfolio.revpar)} at ${formatPercent(calc.portfolio.occupancy * 100)} occupancy.`}
+          {`Portfolio RevPAR ${formatCurrency(calc.portfolio.revpar)} at ${formatPercent(calc.portfolio.occupancy * 100)} occupancy · ${formatCurrency(calc.portfolio.revenue)} revenue on ${formatNumber(Math.round(calc.portfolio.roomsAvailable))} room-nights.`}
         </Text>
       ) : null}
       <View style={[styles.filters, wide ? styles.filtersWide : null]}>
@@ -195,8 +221,8 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
         <SegmentedControl
           label="Sort by"
           options={SORT_OPTIONS}
-          value={sort.key === "occupancy" ? "occupancy" : "revpar"}
-          onChange={(key) => setSort((s) => ({ key, dir: s.dir }))}
+          value={SORT_OPTIONS.find((o) => o.key === sort.key)?.key ?? null}
+          onChange={(key) => setSort({ key, dir: "desc" })}
         />
         <RangeSlider
           label="Market demand"
@@ -225,6 +251,7 @@ const styles = StyleSheet.create({
   col: { gap: space.gap },
   title: { fontFamily: fonts.sans500, fontSize: 16, lineHeight: 22 },
   body: { fontFamily: fonts.sans400, fontSize: 13, lineHeight: 19 },
+  retry: { alignSelf: "flex-start" },
   filters: { gap: 12 },
   filtersWide: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", columnGap: 24 },
 });

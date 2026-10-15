@@ -62,7 +62,10 @@ export function RevparOccTable({
       <Pressable
         key={k}
         accessibilityRole="button"
-        accessibilityLabel={`Sort by ${SORT_LABEL[k]}`}
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={`Sort by ${SORT_LABEL[k]}, ${
+          (active ? sort.dir : k === "name" ? "asc" : "desc") === "asc" ? "ascending" : "descending"
+        }`}
         onPress={() => onSort(k)}
         style={colStyle(k)}
       >

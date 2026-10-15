@@ -7,7 +7,6 @@ export type DailyRow = {
   metric_date: string;
   rooms_sold: number;
   total_revenue: number;
-  occupancy_pct: number;
 };
 
 export type PropertyBase = {
@@ -85,7 +84,7 @@ export function compute(
   demandShift: number,
 ): { rows: PropertyCalc[]; portfolio: Portfolio; daysUsed: number } {
   const mult = DAYS[timeframe];
-  const lines = base.map((p) => {
+  const lines = base.filter((p) => p.days > 0).map((p) => {
     const occ = Math.min(1, p.occupancy * demandShift);
     const roomsAvailable = p.rooms * mult;
     const roomsSold = roomsAvailable * occ;

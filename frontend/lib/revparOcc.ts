@@ -1,7 +1,7 @@
 import type { DailyRow } from "./revparEngine";
 import { supabase } from "./supabase";
 
-const COLUMNS = "property_id,metric_date,rooms_sold,total_revenue,occupancy_pct";
+const COLUMNS = "property_id,metric_date,rooms_sold,total_revenue";
 const PAGE = 1000;
 
 const RE = /^\s*revpar\s+(vs\.?|versus)\s+occupancy\s*$/i;
@@ -13,7 +13,6 @@ type RawRow = {
   metric_date: string;
   rooms_sold: number | string | null;
   total_revenue: number | string | null;
-  occupancy_pct: number | string | null;
 };
 
 const n0 = (v: unknown): number => {
@@ -43,7 +42,6 @@ export async function fetchRevparOccData(
         metric_date: r.metric_date,
         rooms_sold: n0(r.rooms_sold),
         total_revenue: n0(r.total_revenue),
-        occupancy_pct: n0(r.occupancy_pct),
       });
     }
     if (page.length < PAGE) break;

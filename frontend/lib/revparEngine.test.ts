@@ -9,7 +9,7 @@ const props = [
 ];
 
 function mk(id: string, date: string, sold: number, rev: number): DailyRow {
-  return { property_id: id, metric_date: date, rooms_sold: sold, total_revenue: rev, occupancy_pct: 0 };
+  return { property_id: id, metric_date: date, rooms_sold: sold, total_revenue: rev };
 }
 
 function dates(n: number): string[] {
@@ -142,4 +142,13 @@ test("sortRows for every key and direction with stable ties", () => {
 
 test("DAYS constants", () => {
   assert.deepEqual(DAYS, { daily: 1, mtd: 30, ytd: 365 });
+});
+
+test("compute excludes properties with no rows in the window", () => {
+  const rows = [mk("a", "2026-01-02", 80, 8000)];
+  const base = baseInputs(rows, props, "daily", "2026-01-02");
+  const out = compute(base, "daily", 1);
+  assert.deepEqual(out.rows.map((r) => r.id), ["a"]);
+  assert.equal(out.portfolio.rooms, 100);
+  assert.equal(out.portfolio.occupancy, 0.8);
 });

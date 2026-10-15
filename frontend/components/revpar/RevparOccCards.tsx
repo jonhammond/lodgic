@@ -13,17 +13,18 @@ export type RevparOccCardsProps = {
 };
 
 const MINUS = "−";
-const signed = (v: number, text: string, suffix = "") => {
-  const sign = v < 0 && Number(text) !== 0 ? MINUS : "+";
-  return `${sign}${text}${suffix}`;
+const signed = (v: number, digits: number, fmt: (abs: number) => string, suffix = "") => {
+  const r = Math.round(Math.abs(v) * 10 ** digits) / 10 ** digits;
+  const sign = r === 0 ? "" : v < 0 ? MINUS : "+";
+  return `${sign}${fmt(r)}${suffix}`;
 };
 const pointsDelta = (cur: number, base: number) => {
   const d = (cur - base) * 100;
-  return signed(d, Math.abs(d).toFixed(1), " pts");
+  return signed(d, 1, (a) => a.toFixed(1), " pts");
 };
 const currencyDelta = (cur: number, base: number) => {
   const d = cur - base;
-  return signed(d, formatCurrency(Math.abs(d)));
+  return signed(d, 2, formatCurrency);
 };
 
 export function RevparOccCards({ portfolio, baseline, series }: RevparOccCardsProps) {
