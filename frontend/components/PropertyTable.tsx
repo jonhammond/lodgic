@@ -155,12 +155,14 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
     return (
       <View key={c} style={style}>
         <View style={styles.barCell}>
-          <View
-            style={[
-              styles.bar,
-              { width: `${pct}%`, backgroundColor: (barIdx[c] === 0 ? rampColor : undefined) ?? barColors[barIdx[c] % barColors.length] },
-            ]}
-          />
+          <View style={styles.barTrack}>
+            <View
+              style={[
+                styles.bar,
+                { width: `${pct}%`, backgroundColor: (barIdx[c] === 0 ? rampColor : undefined) ?? barColors[barIdx[c] % barColors.length] },
+              ]}
+            />
+          </View>
           <Text numberOfLines={1} style={[styles.text, styles.barText, { color: t.text.primary }]}>
             {money(c, v)}
           </Text>
@@ -284,9 +286,11 @@ const styles = StyleSheet.create({
   text: { fontFamily: fonts.sans400, fontSize: 13, ...tabular },
   bold: { fontFamily: fonts.sans700 },
   heat: { textAlign: "right", paddingVertical: 3, paddingHorizontal: 6, alignSelf: "flex-end" },
-  barCell: { height: 22, position: "relative", justifyContent: "center" },
-  bar: { position: "absolute", left: 0, top: 0, bottom: 0 },
-  barText: { textAlign: "right", paddingRight: 6 },
+  // Bar track and value share the cell side by side, so a 100% bar ends before the text.
+  barCell: { height: 22, flexDirection: "row", alignItems: "center", gap: 8 },
+  barTrack: { flex: 1, height: 22, justifyContent: "center" },
+  bar: { height: 22 },
+  barText: { textAlign: "right", minWidth: 92 },
   groupHead: {
     flexDirection: "row",
     alignItems: "center",

@@ -5,26 +5,60 @@ import { formatByUnit, MetricSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
-import { niceCeil, tickLabel } from "./scale";
+import { niceDomain, tickLabel } from "./scale";
 
 const ROW_H = 26;
-const MAX_LABEL = 18;
-const PAD = { top: 6, bottom: 22, left: 124, right: 56 };
+const ROW_H_WRAPPED = 36;
+const BAR_W = 16;
 const NARROW_W = 360;
-const PAD_NARROW = { ...PAD, left: 96, right: 52 };
 const LABEL_FONT = { fontFamily: fonts.sans400, fontSize: 11 };
+const VALUE_CHAR_W = 6.2; // mono 10px advance
+// Name-axis budget: chars per line and the gutter that fits them.
+const WIDE = { chars: 26, left: 170 };
+const NARROW = { chars: 18, left: 122 };
+// Lightest step of the single-hue ramp; the max bar is the full hue.
+const MIN_ALPHA = 0.4;
 
-const clamp = (s: string) => (s.length > MAX_LABEL ? `${s.slice(0, MAX_LABEL - 1)}…` : s);
+/** Greedy word wrap to at most two lines; a lone over-long word is clipped with an ellipsis. */
+export function wrapLabel(s: string, chars: number): string {
+  const words = s.trim().split(/\s+/);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (!cur) cur = w;
+    else if (cur.length + 1 + w.length <= chars) cur = `${cur} ${w}`;
+    else {
+      lines.push(cur);
+      cur = w;
+    }
+  }
+  lines.push(cur);
+  if (lines.length <= 2) return lines.join("\n");
+  const second = lines.slice(1).join(" ");
+  return `${lines[0]}\n${second.slice(0, chars - 1)}…`;
+}
 
 export function CategoryBarChart({ series }: { series: MetricSeries }) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const { values, labels, color, unit } = series;
   const n = values.length;
-  const max = niceCeil(Math.max(0, ...values));
-  const pad = width > 0 && width < NARROW_W ? PAD_NARROW : PAD;
-  const height = n * ROW_H + pad.top + pad.bottom;
-  const barColors = t.kpi[color];
+  // Hug the data: the longest bar reaches ~the last tick instead of a coarse 1/2/5 ceiling.
+  const domain = niceDomain(0, Math.max(0, ...values), 4);
+  const max = domain.hi;
+  // Narrow tracks only have room for the end-point ticks.
+  const narrow = width > 0 && width < NARROW_W;
+  const ticks = narrow ? [0, max] : domain.ticks;
+  const layout = narrow ? NARROW : WIDE;
+  const names = labels.map((l) => wrapLabel(l ?? "", layout.chars));
+  const wrapped = names.some((s) => s.includes("\n"));
+  const rowH = wrapped ? ROW_H_WRAPPED : ROW_H;
+  const valueText = values.map((v) => formatByUnit(v, unit));
+  // Reserve the right gutter for the widest value label so the longest bar never runs under it.
+  const valueW = Math.max(0, ...valueText.map((s) => s.length)) * VALUE_CHAR_W + 12;
+  const pad = { top: 6, bottom: 22, left: layout.left, right: Math.ceil(valueW) };
+  const height = n * rowH + pad.top + pad.bottom;
+  const hue = t.kpi[color].bar;
   // Victory draws x=1 at the bottom of a horizontal chart; invert so row 0 is on top.
   const data = values.map((y, i) => ({ x: n - i, y }));
 
@@ -46,7 +80,8 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
           >
             <VictoryAxis
               tickValues={data.map((d) => d.x)}
-              tickFormat={(x: number) => clamp(labels[n - x] ?? "")}
+              tickFormat={(x: number) => names[n - x] ?? ""}
+              tickLabelComponent={<VictoryLabel lineHeight={1.15} />}
               style={{
                 axis: { stroke: "transparent" },
                 grid: { stroke: "none" },
@@ -56,7 +91,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
             />
             <VictoryAxis
               dependentAxis
-              tickValues={[0, max / 2, max]}
+              tickValues={ticks}
               tickFormat={(v: number) => tickLabel(v, unit)}
               style={{
                 axis: { stroke: t.border.axis, strokeWidth: 1 },
@@ -68,20 +103,22 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
                   fill: t.text.tick,
                   padding: 6,
                   textAnchor: ({ index }: { index?: number | string }) =>
-                    Number(index) === 2 ? "end" : Number(index) === 0 ? "start" : "middle",
+                    Number(index) === ticks.length - 1 ? "end" : Number(index) === 0 ? "start" : "middle",
                 },
               }}
             />
             <VictoryBar
               data={data}
-              barWidth={ROW_H - 10}
-              cornerRadius={0}
+              barWidth={BAR_W}
+              cornerRadius={{ top: 2 }}
               labels={({ datum }) => formatByUnit(datum.y, unit)}
               labelComponent={<VictoryLabel dx={4} textAnchor="start" />}
               style={{
                 data: {
-                  fill: ({ index }: { index?: number | string }) =>
-                    Number(index) === 0 ? barColors.line : barColors.bar,
+                  fill: hue,
+                  // Sequential single-hue ramp: lighter for smaller values, full hue at the max.
+                  fillOpacity: ({ datum }: { datum?: { y: number } }) =>
+                    max > 0 && datum ? MIN_ALPHA + (1 - MIN_ALPHA) * (datum.y / max) : 1,
                 },
                 labels: {
                   fontFamily: fonts.mono400,

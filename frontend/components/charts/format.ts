@@ -51,8 +51,24 @@ export function columnRoles(rows: Row[]): { xKey: string; yKeys: string[] } {
   return { xKey, yKeys };
 }
 
+const ACRONYMS = /^(rgi|mpi|ari|adr|revpar|nps|csat|gop|cpor|ota|gds|ytd|mtd|id)$/i;
+
+/** snake_case column key -> Title Case label; hospitality acronyms keep their casing. */
 export function humanize(key: string): string {
-  return key.replace(/_/g, " ");
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((w) =>
+      ACRONYMS.test(w)
+        ? w.toUpperCase().replace("REVPAR", "RevPAR")
+        : w.replace(/^\w/, (c) => c.toUpperCase()),
+    )
+    .join(" ");
+}
+
+/** Short unit tag for chart notes: "%" rather than "percent". */
+export function unitLabel(unit: "currency" | "percent" | "index" | "number"): string {
+  return unit === "percent" ? "%" : unit === "currency" ? "USD" : unit;
 }
 
 export function formatCurrency(v: number): string {

@@ -5,11 +5,13 @@ import {
   formatIndex,
   formatNumber,
   formatPercent,
+  humanize,
   isDateLike,
   isNumeric,
   isPercentLikeKey,
   monthLabel,
   toNumber,
+  unitLabel,
 } from "../components/charts/format";
 import type { QueryResult } from "./api";
 
@@ -96,13 +98,6 @@ export function formatByUnit(v: number, unit: MetricUnit): string {
   return formatNumber(v);
 }
 
-const ACRONYMS = /^(rgi|mpi|ari|adr|revpar|nps|csat|gop|cpor|ota|gds)$/i;
-const titleCase = (k: string) =>
-  k
-    .split("_")
-    .map((w) => (ACRONYMS.test(w) ? w.toUpperCase().replace("REVPAR", "RevPAR") : w.replace(/^\w/, (c) => c.toUpperCase())))
-    .join(" ");
-
 const lbl = (s: string) => s.trim();
 
 function timeFacts(c: Pick<MetricSeries, "values" | "labels" | "unit">): string[] {
@@ -137,7 +132,7 @@ function categoryFacts(c: MetricSeries, xKey: string): string[] {
   const sum = sorted.reduce((a, r) => a + r.value, 0);
   out.push(
     isAdditiveKey(c.key)
-      ? `Portfolio total ${fmt(sum)} across ${sorted.length} ${/^name$|property/i.test(xKey) ? "properties" : titleCase(xKey).toLowerCase() + " groups"}.`
+      ? `Portfolio total ${fmt(sum)} across ${sorted.length} ${/^name$|property/i.test(xKey) ? "properties" : humanize(xKey).toLowerCase() + " groups"}.`
       : `Average ${fmt(sum / sorted.length)}; spread ${fmt(top.value - bottom.value)}.`,
   );
   return out;
@@ -296,8 +291,8 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
       return {
         kind: "trend",
         key,
-        title: titleCase(key),
-        note: weekly ? `weekly \u00b7 ${unit}` : unit,
+        title: humanize(key),
+        note: weekly ? `weekly \u00b7 ${unitLabel(unit)}` : unitLabel(unit),
         unit,
         labels,
         series: rankSeries(names.map((n) => ({ name: n, values: byName.get(n)! }))),
@@ -336,12 +331,12 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         return {
           kind: "trend",
           key,
-          title: titleCase(key),
-          note: unit,
+          title: humanize(key),
+          note: unitLabel(unit),
           unit,
           labels,
           series: rankSeries([
-            { name: titleCase(key), values: rows.map((r) => (r[key] == null ? null : toNumber(r[key]))) },
+            { name: humanize(key), values: rows.map((r) => (r[key] == null ? null : toNumber(r[key]))) },
           ]),
           reference: { y: 100, label: "Market fair share" },
         };
@@ -354,8 +349,8 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
       return {
         kind: "time",
         key,
-        title: titleCase(key),
-        note: partialLast ? `${monthLabel(xs[xs.length - 1])} MTD` : unit,
+        title: humanize(key),
+        note: partialLast ? `${monthLabel(xs[xs.length - 1])} MTD` : unitLabel(unit),
         labels,
         values,
         color: colorFor(key, i),
@@ -383,8 +378,8 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
       return {
         kind: "category",
         key,
-        title: titleCase(key),
-        note: unit,
+        title: humanize(key),
+        note: unitLabel(unit),
         labels,
         values: rows.map((r) => (r[key] == null ? 0 : toNumber(r[key]))),
         color: colorFor(key, i),
