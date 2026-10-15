@@ -119,8 +119,11 @@ export const dark: Palette = {
     linkHover: "#c2d3ff",
   },
   delta: { up: "#7fe0b4", down: "#ff8fa8", error: "#ff8fa8" },
-  kpi,
-  table: tableColors,
+  kpi: {
+    ...kpi,
+    revenue: { line: accents.blueFocus, glow: "#4c7dd9bf", bar: accents.blueFocus, barPartial: "#4c7dd98c" },
+  },
+  table: { ...tableColors, revenueBar: accents.blueFocus },
   trend: {
     ramp: ["#34c98a", "#148c7a", "#62b4f0", "#3356c4", "#c0a8ff", "#7e3bb0", "#f58ab8", "#b5265f", "#ffa040", "#c44711"],
     mid: "#5b6670",

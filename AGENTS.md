@@ -26,6 +26,14 @@ Hospitality analytics AI demo: natural-language questions → Gemini 3.5 Flash-L
 
 - Single-screen UI: PromptBar, PresetChips, ResultCanvas (kpi/bar/**trend line**/table, chosen by data shape in `frontend/lib/resultMapping.ts`), SqlAccordion. Multi-series trends use a ranked colour ramp (`theme.trend.ramp`, assigned by average rank) and long-format results render a week-grouped, collapsible table. Mobile-responsive (narrow iframe).
 
+## Claude Code automation
+
+- Hook `.claude/hooks/post-edit-check.sh` (PostToolUse Edit|Write): Deno fmt/check for the function, `tsc` + eslint for `frontend/`; exit 2 on failure.
+- Hookify rules (`.claude/hookify.*.local.md`): block `supabase db push|reset` and force push; warn on guard/prompt edits.
+- Skills: `/fn-test`, `/fn-deploy` (manual only), `/prompt-regress [--record]`.
+- Agents: `sql-guard-reviewer`, `chart-reviewer` (needs Expo dev server on :8081).
+- `/prompt-regress` prerequisite: start `supabase functions serve text-to-sql --env-file supabase/functions/.env` yourself via `!`.
+
 ## **Always:**
 
 - Run linting and tests before committing

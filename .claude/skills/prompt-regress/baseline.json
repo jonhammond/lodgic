@@ -1,0 +1,103 @@
+[
+  {
+    "question": "Portfolio ADR, last 30 days",
+    "chart": "kpi",
+    "title": "Portfolio ADR - Last 30 Days",
+    "columns": [
+      "portfolio_adr"
+    ],
+    "rowCount": 1,
+    "error": null
+  },
+  {
+    "question": "RevPAR vs occupancy",
+    "chart": "kpi",
+    "title": "Portfolio RevPAR and Occupancy (Last 30 Days)",
+    "columns": [
+      "occupancy_pct",
+      "revpar"
+    ],
+    "rowCount": 1,
+    "error": null
+  },
+  {
+    "question": "Top property by occupancy",
+    "chart": "bar",
+    "title": "Top Properties by Occupancy",
+    "columns": [
+      "name",
+      "occupancy_pct"
+    ],
+    "rowCount": 10,
+    "error": null
+  },
+  {
+    "question": "Revenue by property this month",
+    "chart": "bar",
+    "title": "Revenue by Property This Month",
+    "columns": [
+      "name",
+      "total_revenue"
+    ],
+    "rowCount": 10,
+    "error": null
+  },
+  {
+    "question": "Total revenue yesterday",
+    "chart": "bar",
+    "title": "Total Revenue Yesterday by Property",
+    "columns": [
+      "name",
+      "total_revenue"
+    ],
+    "rowCount": 10,
+    "error": null
+  },
+  {
+    "question": "Direct booking ratio by property, last 30 days",
+    "chart": "bar",
+    "title": "Direct Booking Ratio by Property (Last 30 Days)",
+    "columns": [
+      "direct_booking_ratio",
+      "name"
+    ],
+    "rowCount": 10,
+    "error": null
+  },
+  {
+    "question": "CPOR vs ADR by property",
+    "chart": "bar",
+    "title": "CPOR vs ADR by Property",
+    "columns": [
+      "adr",
+      "cpor",
+      "name"
+    ],
+    "rowCount": 10,
+    "error": null
+  },
+  {
+    "question": "RGI trend, last 60 days",
+    "chart": "line",
+    "title": "Revenue Generation Index (RGI) Trend over the Last 60 Days",
+    "columns": [
+      "name",
+      "rgi",
+      "week_ending"
+    ],
+    "rowCount": 100,
+    "error": null
+  },
+  {
+    "question": "NPS and CSAT by segment",
+    "chart": "bar",
+    "title": "NPS and CSAT by Segment",
+    "columns": [
+      "csat",
+      "nps",
+      "segment"
+    ],
+    "rowCount": 5,
+    "error": null
+  }
+]

@@ -207,9 +207,14 @@ function AppInner() {
   const scrollRef = useRef<ScrollView>(null);
   const resultY = useRef(0);
   const [resultSeq, setResultSeq] = useState(0);
+  // Bump the flash key during render when a new result arrives (no effect-driven setState).
+  const [prevResult, setPrevResult] = useState(result);
+  if (result !== prevResult) {
+    setPrevResult(result);
+    if (result) setResultSeq((s) => s + 1);
+  }
   useEffect(() => {
     if (!result) return;
-    setResultSeq((s) => s + 1);
     const id = requestAnimationFrame(() =>
       scrollRef.current?.scrollTo({ y: Math.max(0, resultY.current - 12), animated: true }),
     );

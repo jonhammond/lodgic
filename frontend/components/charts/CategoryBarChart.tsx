@@ -17,7 +17,8 @@ const VALUE_CHAR_W = 6.2; // mono 10px advance
 const WIDE = { chars: 26, left: 170 };
 const NARROW = { chars: 18, left: 122 };
 // Lightest step of the single-hue ramp; the max bar is the full hue.
-const MIN_ALPHA = 0.4;
+// 0.9 keeps the smallest revenue bar >= 3:1 on both panels (dark blueFocus on #262d33 = 3.09, light blue on #fff = 4.96).
+const MIN_ALPHA = 0.9;
 
 /** Greedy word wrap to at most two lines; a lone over-long word is clipped with an ellipsis. */
 export function wrapLabel(s: string, chars: number): string {

@@ -2,6 +2,7 @@ import {
   buildSummaryPrompt,
   clampSentences,
   SUMMARY_MAX_CELL,
+  SUMMARY_SYSTEM_PROMPT,
 } from "./summary_prompt.ts";
 
 function assert(cond: boolean, msg: string) {
@@ -57,4 +58,16 @@ Deno.test("clampSentences flattens bullets and newlines", () => {
 
 Deno.test("clampSentences empty returns empty", () => {
   assert(clampSentences("  \n ") === "", "not empty");
+});
+
+Deno.test("system prompt requires exact numbers and computed totals", () => {
+  for (
+    const s of [
+      "copied exactly from the result rows",
+      "never round or estimate",
+      "compute totals by summing the rows rather than recalling them",
+    ]
+  ) {
+    assert(SUMMARY_SYSTEM_PROMPT.includes(s), `missing rule: ${s}`);
+  }
 });
