@@ -5,6 +5,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { validateSql } from "./sql_guard.ts";
 import { CHARTS, SYSTEM_PROMPT } from "./schema_prompt.ts";
 import { parsePropertyIds, scopePrompt } from "./request.ts";
+import {
+  buildSummaryPrompt,
+  clampSentences,
+  SUMMARY_SCHEMA,
+  SUMMARY_SYSTEM_PROMPT,
+} from "./summary_prompt.ts";
 
 const RATE_LIMIT_PER_HOUR = 20;
 const MAX_PROMPT_CHARS = 500;
@@ -40,6 +46,8 @@ const RESPONSE_SCHEMA = {
   },
   required: ["sql", "recommended_chart", "report_title"],
 };
+
+const SUMMARY_TIMEOUT_MS = 8_000;
 
 class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -158,21 +166,22 @@ async function geminiRequest(
   model: string,
   prompt: string,
   apiKey: string,
+  opts: { system: string; schema: unknown; timeoutMs: number },
 ): Promise<Response> {
   try {
     return await fetch(geminiUrl(model), {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        systemInstruction: { parts: [{ text: opts.system }] },
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0,
           responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
+          responseSchema: opts.schema,
         },
       }),
-      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      signal: AbortSignal.timeout(opts.timeoutMs),
     });
   } catch {
     throw new ApiError(
@@ -189,13 +198,18 @@ async function callGemini(
   model: string,
   fallbackModel: string,
 ): Promise<GeminiOutput> {
-  let res = await geminiRequest(model, prompt, apiKey);
+  const opts = {
+    system: SYSTEM_PROMPT,
+    schema: RESPONSE_SCHEMA,
+    timeoutMs: GEMINI_TIMEOUT_MS,
+  };
+  let res = await geminiRequest(model, prompt, apiKey, opts);
   if (res.status === 429 && fallbackModel && fallbackModel !== model) {
     await res.body?.cancel();
     console.warn(
       `gemini ${model} returned 429; retrying with ${fallbackModel}`,
     );
-    res = await geminiRequest(fallbackModel, prompt, apiKey);
+    res = await geminiRequest(fallbackModel, prompt, apiKey, opts);
   }
   if (res.status === 429) {
     await res.body?.cancel();
@@ -228,6 +242,47 @@ async function callGemini(
       "llm_bad_response",
       "Model returned an unusable response",
     );
+  }
+}
+
+async function summarizeRows(
+  question: string,
+  title: string,
+  rows: Record<string, unknown>[],
+  caveat: string,
+  apiKey: string,
+  model: string,
+  fallbackModel: string,
+): Promise<string | null> {
+  if (rows.length === 0) return null;
+  const prompt = buildSummaryPrompt(question, title, rows, caveat);
+  const opts = {
+    system: SUMMARY_SYSTEM_PROMPT,
+    schema: SUMMARY_SCHEMA,
+    timeoutMs: SUMMARY_TIMEOUT_MS,
+  };
+  try {
+    let res = await geminiRequest(model, prompt, apiKey, opts);
+    if (res.status === 429 && fallbackModel && fallbackModel !== model) {
+      await res.body?.cancel();
+      res = await geminiRequest(fallbackModel, prompt, apiKey, opts);
+    }
+    if (!res.ok) {
+      await res.body?.cancel();
+      console.warn(`summary skipped: HTTP ${res.status}`);
+      return null;
+    }
+    const payload = await res.json();
+    const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const out = JSON.parse(text);
+    if (typeof out?.summary !== "string") throw new Error("shape");
+    return clampSentences(out.summary) || null;
+  } catch (e) {
+    console.warn(
+      "summary skipped:",
+      e instanceof Error ? e.message : "unknown",
+    );
+    return null;
   }
 }
 
@@ -328,6 +383,16 @@ async function handle(
     );
   }
 
+  const summary = await summarizeRows(
+    prompt,
+    gen.report_title,
+    rows ?? [],
+    gen.caveat ?? "",
+    geminiKey,
+    geminiModel,
+    geminiFallbackModel,
+  );
+
   return json(
     {
       sql: check.sql,
@@ -335,6 +400,7 @@ async function handle(
       title: gen.report_title,
       rows: rows ?? [],
       caveat: gen.caveat || null,
+      summary,
       duration_ms: durationMs,
     },
     200,

@@ -6,7 +6,9 @@ import { Skeleton } from "./Skeleton";
 
 type Props = {
   status: "idle" | "loading" | "error" | "rate_limited";
-  summary: string | null;
+  headline: string | null;
+  findings: string | null;
+  facts: string[];
   caveat: string | null;
   errorMessage: string | null;
   rowCount: number | null;
@@ -22,7 +24,9 @@ const hovered = (s: PressableStateCallbackType) =>
 
 export function AnswerCard({
   status,
-  summary,
+  headline,
+  findings,
+  facts,
   caveat,
   errorMessage,
   rowCount,
@@ -40,8 +44,9 @@ export function AnswerCard({
     .filter(Boolean)
     .join(" · ");
 
-  const summaryText = summary ? (
-    <Text style={[styles.summary, { color: t.text.primary }]}>{summary}</Text>
+  const paragraph = findings?.trim() ? findings.trim() : facts.length > 0 ? facts.join(" ") : null;
+  const summaryText = headline ? (
+    <Text style={[styles.headline, { color: t.text.primary }]}>{headline}</Text>
   ) : null;
   const caveatText = (text: string) => (
     <Text style={[styles.caveat, { color: t.text.muted }]}>{text}</Text>
@@ -77,10 +82,11 @@ export function AnswerCard({
         </Pressable>
       </>
     );
-  } else if (summary) {
+  } else if (headline) {
     body = (
       <>
         {summaryText}
+        {paragraph ? <Text style={[styles.findings, { color: t.text.secondary }]}>{paragraph}</Text> : null}
         {caveat ? caveatText(caveat) : null}
       </>
     );
@@ -120,12 +126,13 @@ export function AnswerCard({
 }
 
 const styles = StyleSheet.create({
-  card: { paddingVertical: 18, paddingHorizontal: 20, gap: 12 },
+  card: { paddingVertical: 14, paddingHorizontal: 18, gap: 8 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   title: { fontFamily: fonts.sans700, fontSize: 13 },
   meta: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
   body: { fontFamily: fonts.sans400, fontSize: 13 },
-  summary: { fontFamily: fonts.sans500, fontSize: 18, lineHeight: 25 },
+  headline: { fontFamily: fonts.sans500, fontSize: 16, lineHeight: 22 },
+  findings: { fontFamily: fonts.sans400, fontSize: 13, lineHeight: 19 },
   caveat: { fontFamily: fonts.sans400, fontSize: 13, lineHeight: 19.5 },
   link: { alignSelf: "flex-start" },
   codeBox: { flexGrow: 0 },

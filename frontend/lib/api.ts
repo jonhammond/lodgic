@@ -7,6 +7,7 @@ export type QueryResult = {
   title: string;
   rows: Record<string, unknown>[];
   caveat?: string | null;
+  summary?: string | null;
   duration_ms?: number;
 };
 

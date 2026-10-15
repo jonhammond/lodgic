@@ -38,7 +38,8 @@ export type MetricSeries = {
 };
 
 export type MappedResult = {
-  summary: string;
+  headline: string;
+  facts: string[];
   charts: MetricSeries[];
   table: { columns: string[]; rows: Record<string, unknown>[] } | null;
 };
@@ -82,9 +83,53 @@ export function formatByUnit(v: number, unit: MetricUnit): string {
 const titleCase = (k: string) =>
   k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+const lbl = (s: string) => s.trim();
+
+function timeFacts(c: MetricSeries): string[] {
+  const v = c.values;
+  if (v.length < 2) return [];
+  const fmt = (n: number) => formatByUnit(n, c.unit);
+  const last = v.length - 1;
+  let pct = "";
+  if (v[0] !== 0) {
+    const p = Math.round(((v[last] - v[0]) / Math.abs(v[0])) * 100);
+    pct = ` (${p >= 0 ? "+" : ""}${p}%)`;
+  }
+  const hi = v.indexOf(Math.max(...v));
+  const lo = v.indexOf(Math.min(...v));
+  return [
+    `${fmt(v[0])} on ${lbl(c.labels[0])} to ${fmt(v[last])} on ${lbl(c.labels[last])}${pct}.`,
+    `Peak ${fmt(v[hi])} on ${lbl(c.labels[hi])}; low ${fmt(v[lo])} on ${lbl(c.labels[lo])}.`,
+  ];
+}
+
+function categoryFacts(c: MetricSeries, xKey: string): string[] {
+  const fmt = (n: number) => formatByUnit(n, c.unit);
+  const sorted = c.labels
+    .map((label, i) => ({ label: lbl(label), value: c.values[i] }))
+    .sort((a, b) => b.value - a.value);
+  const top = sorted[0];
+  const bottom = sorted[sorted.length - 1];
+  const out = [`${top.label} leads at ${fmt(top.value)}.`];
+  if (sorted.length >= 2 && top.label !== bottom.label) {
+    out.push(`${bottom.label} is lowest at ${fmt(bottom.value)}.`);
+  }
+  const sum = sorted.reduce((a, r) => a + r.value, 0);
+  out.push(
+    isAdditiveKey(c.key)
+      ? `Portfolio total ${fmt(sum)} across ${sorted.length} ${/^name$|property/i.test(xKey) ? "properties" : titleCase(xKey).toLowerCase() + " groups"}.`
+      : `Average ${fmt(sum / sorted.length)}; spread ${fmt(top.value - bottom.value)}.`,
+  );
+  return out;
+}
+
+function tableFacts(rows: Record<string, unknown>[]): string[] {
+  return [`${rows.length} rows \u00d7 ${Object.keys(rows[0]).length} columns.`];
+}
+
 export function mapResult(result: QueryResult, now: Date = new Date()): MappedResult {
   const { rows, chart, title } = result;
-  const empty = { summary: title, charts: [], table: null };
+  const empty: MappedResult = { headline: title, facts: [], charts: [], table: null };
   if (rows.length === 0) return empty;
 
   if (chart === "kpi") {
@@ -96,13 +141,13 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
       return typeof v === "string" && v.trim() !== "" && !isNumeric(v) && !isDateLike(v);
     });
     const value = k === undefined ? null : formatByUnit(toNumber(row[k]), unitFor(k as string));
-    const summary =
+    const headline =
       value === null
         ? title
         : labelKey === undefined
           ? `${title}: ${value}`
           : `${title}: ${String(row[labelKey]).trim()} \u2014 ${value}`;
-    return { summary, charts: [], table: null };
+    return { headline, facts: [], charts: [], table: null };
   }
 
   const tableOf = () => ({ columns: Object.keys(rows[0]), rows });
@@ -113,7 +158,7 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
   const xs = rows.map((r) => String(r[xKey] ?? ""));
   const dated = xs.every(isDateLike);
   if ((chart === "line" || dated) && rows.length > 1) {
-    if (yKeys.length === 0) return { summary: title, charts: [], table: tableOf() };
+    if (yKeys.length === 0) return { headline: title, facts: tableFacts(rows), charts: [], table: tableOf() };
     const monthly = dated && xs.every((x) => x.slice(8, 10) === "01");
     const labels = xs.map((x) =>
       monthly ? monthLabel(x) : dated ? `${x.slice(5, 7)}/${x.slice(8, 10)}` : x,
@@ -141,7 +186,7 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         unit,
       };
     });
-    return { summary: title, charts, table: null };
+    return { headline: title, facts: timeFacts(charts[0]), charts, table: null };
   }
 
   if (rows.length >= 2 && rows.length <= 20 && !dated && yKeys.length >= 1) {
@@ -161,15 +206,15 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         unit,
       };
     });
-    let summary = title;
+    let headline = title;
     if (charts.length === 1) {
       const c = charts[0];
-      summary = isAdditiveKey(c.key)
+      headline = isAdditiveKey(c.key)
         ? `${title}: ${formatByUnit(c.values.reduce((a, b) => a + b, 0), c.unit)}`
         : `${title}: ${c.labels[0]} \u2014 ${formatByUnit(c.values[0], c.unit)}`;
     }
-    return { summary, charts, table: tableOf() };
+    return { headline, facts: categoryFacts(charts[0], xKey), charts, table: tableOf() };
   }
 
-  return { summary: title, charts: [], table: tableOf() };
+  return { headline: title, facts: tableFacts(rows), charts: [], table: tableOf() };
 }

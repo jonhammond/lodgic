@@ -281,6 +281,20 @@ function AppInner() {
             resultY.current = y;
           }}
         >
+          <AnswerCard
+            status={status}
+            headline={mapped?.headline ?? null}
+            findings={result?.summary ?? null}
+            facts={mapped?.facts ?? []}
+            caveat={result?.caveat ?? null}
+            errorMessage={errorMessage}
+            rowCount={result?.rows.length ?? null}
+            durationMs={result?.duration_ms ?? null}
+            sql={result?.sql ?? null}
+            sqlOpen={sqlOpen}
+            onToggleSql={() => dispatch({ type: "TOGGLE_SQL" })}
+            onResetRateLimit={() => dispatch({ type: "RESET_RATE_LIMIT" })}
+          />
           {mapped && mapped.charts.length > 0 ? (
             <Grid minWidth={280}>
               {mapped.charts.map((s) =>
@@ -292,23 +306,9 @@ function AppInner() {
               )}
             </Grid>
           ) : null}
-          <Grid minWidth={340} alignStart>
-            {mapped?.table && result ? (
-              <PropertyTable title={result.title} columns={mapped.table.columns} rows={mapped.table.rows} />
-            ) : null}
-            <AnswerCard
-              status={status}
-              summary={mapped?.summary ?? null}
-              caveat={result?.caveat ?? null}
-              errorMessage={errorMessage}
-              rowCount={result?.rows.length ?? null}
-              durationMs={result?.duration_ms ?? null}
-              sql={result?.sql ?? null}
-              sqlOpen={sqlOpen}
-              onToggleSql={() => dispatch({ type: "TOGGLE_SQL" })}
-              onResetRateLimit={() => dispatch({ type: "RESET_RATE_LIMIT" })}
-            />
-          </Grid>
+          {mapped?.table && result ? (
+            <PropertyTable title={result.title} columns={mapped.table.columns} rows={mapped.table.rows} />
+          ) : null}
         </ResultBlock>
         <KpiSections snapshot={kpis.data} loading={kpis.status === "loading"} />
         <Footer />
