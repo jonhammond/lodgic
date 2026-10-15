@@ -200,6 +200,24 @@ async function geminiRequest(
   }
 }
 
+function logUsage(
+  stage: "sql" | "summary",
+  model: string,
+  payload: unknown,
+): void {
+  const u = (payload as { usageMetadata?: Record<string, number> })
+    ?.usageMetadata ?? {};
+  console.info(JSON.stringify({
+    usage: stage,
+    model,
+    prompt: u.promptTokenCount ?? 0,
+    output: u.candidatesTokenCount ?? 0,
+    thoughts: u.thoughtsTokenCount ?? 0,
+    cached: u.cachedContentTokenCount ?? 0,
+    total: u.totalTokenCount ?? 0,
+  }));
+}
+
 async function callGemini(
   prompt: string,
   apiKey: string,
@@ -211,12 +229,14 @@ async function callGemini(
     schema: RESPONSE_SCHEMA,
     timeoutMs: GEMINI_TIMEOUT_MS,
   };
+  let used = model;
   let res = await geminiRequest(model, prompt, apiKey, opts);
   if (res.status === 429 && fallbackModel && fallbackModel !== model) {
     await res.body?.cancel();
     console.warn(
       `gemini ${model} returned 429; retrying with ${fallbackModel}`,
     );
+    used = fallbackModel;
     res = await geminiRequest(fallbackModel, prompt, apiKey, opts);
   }
   if (res.status === 429) {
@@ -233,6 +253,7 @@ async function callGemini(
   }
   try {
     const payload = await res.json();
+    logUsage("sql", used, payload);
     const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
     const out = JSON.parse(text);
     if (
@@ -270,9 +291,11 @@ async function summarizeRows(
     timeoutMs: SUMMARY_TIMEOUT_MS,
   };
   try {
+    let used = model;
     let res = await geminiRequest(model, prompt, apiKey, opts);
     if (res.status === 429 && fallbackModel && fallbackModel !== model) {
       await res.body?.cancel();
+      used = fallbackModel;
       res = await geminiRequest(fallbackModel, prompt, apiKey, opts);
     }
     if (!res.ok) {
@@ -281,6 +304,7 @@ async function summarizeRows(
       return null;
     }
     const payload = await res.json();
+    logUsage("summary", used, payload);
     const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
     const out = JSON.parse(text);
     if (typeof out?.summary !== "string") throw new Error("shape");
