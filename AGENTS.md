@@ -24,7 +24,7 @@ Hospitality analytics AI demo: natural-language questions → Gemini 3.5 Flash-L
 
 ## Design
 
-- Single-screen UI: PromptBar, PresetChips, ResultCanvas (kpi/bar/line/table on `recommended_chart`), SqlAccordion. Mobile-responsive (narrow iframe).
+- Single-screen UI: PromptBar, PresetChips, ResultCanvas (kpi/bar/**trend line**/table, chosen by data shape in `frontend/lib/resultMapping.ts`), SqlAccordion. Mobile-responsive (narrow iframe).
 
 ## **Always:**
 

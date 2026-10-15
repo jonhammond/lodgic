@@ -1,6 +1,7 @@
 {
   "enabledPlugins": {
     "vercel@anthropic-plugin-directory": true,
-    "expo@anthropic-plugin-directory": true
+    "expo@anthropic-plugin-directory": true,
+    "chrome-devtools-mcp@claude-plugins-official": true
   }
 }
