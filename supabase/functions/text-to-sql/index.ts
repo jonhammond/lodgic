@@ -12,13 +12,15 @@ import {
   SUMMARY_SYSTEM_PROMPT,
 } from "./summary_prompt.ts";
 
+// Temporarily disabled; re-enable per TODO.md.
+const HOURLY_RATE_LIMIT_ENABLED = false;
 const RATE_LIMIT_PER_HOUR = 20;
 // Each request makes up to 2 Gemini calls plus a fallback retry; 6/min keeps Flash-Lite under the 15 RPM free-tier cap.
 const GLOBAL_LIMIT_PER_MINUTE = 6;
 const MAX_PROMPT_CHARS = 500;
 const GEMINI_TIMEOUT_MS = 20_000;
 const RPC_TIMEOUT_MS = 10_000;
-const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite";
 
 function geminiUrl(model: string): string {
@@ -328,24 +330,26 @@ async function handle(
 
   // Rate limit
   const ipHash = await hashIp(clientIp(req), salt);
-  const { data: count, error: countErr } = await supabase.rpc(
-    "count_recent_queries",
-    { p_ip_hash: ipHash },
-  );
-  if (countErr) {
-    console.error("count_recent_queries failed", countErr.code);
-    throw new ApiError(
-      500,
-      "rate_limit_check_failed",
-      "Could not verify rate limit",
+  if (HOURLY_RATE_LIMIT_ENABLED) {
+    const { data: count, error: countErr } = await supabase.rpc(
+      "count_recent_queries",
+      { p_ip_hash: ipHash },
     );
-  }
-  if (typeof count === "number" && count >= RATE_LIMIT_PER_HOUR) {
-    throw new ApiError(
-      429,
-      "rate_limited",
-      `Rate limit of ${RATE_LIMIT_PER_HOUR} queries per hour exceeded`,
-    );
+    if (countErr) {
+      console.error("count_recent_queries failed", countErr.code);
+      throw new ApiError(
+        500,
+        "rate_limit_check_failed",
+        "Could not verify rate limit",
+      );
+    }
+    if (typeof count === "number" && count >= RATE_LIMIT_PER_HOUR) {
+      throw new ApiError(
+        429,
+        "rate_limited",
+        `Rate limit of ${RATE_LIMIT_PER_HOUR} queries per hour exceeded`,
+      );
+    }
   }
   const { data: n, error: globalErr } = await supabase.rpc(
     "count_queries_last_minute",

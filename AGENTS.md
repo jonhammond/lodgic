@@ -20,7 +20,7 @@ Hospitality analytics AI demo: natural-language questions → Gemini 3.5 Flash-L
 
 - Local stack: `supabase start` (Docker), then `supabase migration up`; serve the function with `supabase functions serve text-to-sql --env-file supabase/functions/.env`.
 - Deno not installed on host; run `deno check/test/lint/fmt` via the `denoland/deno` Docker image.
-- Gemini: `gemini-3.5-flash-lite` default (`GEMINI_MODEL`), one retry on HTTP 429 with `gemini-3.1-flash-lite` (`GEMINI_FALLBACK_MODEL`, empty disables); free-tier quotas are per project and model, visible only in AI Studio. Via `generativelanguage.googleapis.com/v1beta`, key in `x-goog-api-key` header, `responseMimeType: application/json` + `responseSchema`.
+- Gemini: `gemini-2.5-flash-lite` default (`GEMINI_MODEL`), one retry on HTTP 429 with `gemini-3.1-flash-lite` (`GEMINI_FALLBACK_MODEL`, empty disables); free-tier quotas are per project and model, visible only in AI Studio. Via `generativelanguage.googleapis.com/v1beta`, key in `x-goog-api-key` header, `responseMimeType: application/json` + `responseSchema`.
 
 ## Design
 
