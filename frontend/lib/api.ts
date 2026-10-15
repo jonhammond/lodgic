@@ -23,6 +23,9 @@ function mapError(code: string): string {
   if (code === "rate_limited") {
     return "Rate limit reached — 20 queries per hour. Try again later.";
   }
+  if (code === "busy") {
+    return "Demo is busy, try again in a minute.";
+  }
   if (code === "unsafe_sql") {
     return "That question produced a query we couldn't safely run — try rephrasing.";
   }

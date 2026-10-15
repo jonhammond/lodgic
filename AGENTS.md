@@ -13,7 +13,7 @@ Hospitality analytics AI demo: natural-language questions → Gemini 3.5 Flash-L
 ## Stack
 
 - Supabase Postgres: `properties`, `daily_metrics` (RLS, anon SELECT), `ai_query_log` (rate limiting, service_role only), `pg_cron` nightly generator `generate_daily_hotel_metrics(date)`, seed = 3 properties × 90 days.
-- Edge Function `supabase/functions/text-to-sql/` (Deno): CORS allow-list, salted SHA-256 IP hash, 20 req/hr/IP, Gemini structured JSON output (`{sql, recommended_chart, report_title, caveat}`), `sql_guard.ts` validation mirroring the RPC checks, then a second non-fatal Gemini pass over the result rows producing `summary` (2–5 sentences, `summary_prompt.ts`; null on failure). Tests: `deno test` in that directory.
+- Edge Function `supabase/functions/text-to-sql/` (Deno): CORS allow-list, salted SHA-256 IP hash, 20 req/hr/IP plus a global 6 req/min cap (`count_queries_last_minute`), Gemini structured JSON output (`{sql, recommended_chart, report_title, caveat}`), `sql_guard.ts` validation mirroring the RPC checks, then a second non-fatal Gemini pass over the result rows producing `summary` (2–5 sentences, `summary_prompt.ts`; null on failure). Tests: `deno test` in that directory.
 - Frontend: `frontend/` Expo blank-TS / React Native Web, `victory` charts (imported only in `components/charts/`), design tokens in `frontend/theme/`; static export to Vercel pending.
 
 ## Core

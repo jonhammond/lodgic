@@ -7,7 +7,7 @@ Live demo: https://lodgic.jonhammond.org
 ## Stack
 
 - **DB:** Supabase Postgres — `properties` (10 hotels across luxury–midscale segments) + `daily_metrics` (revenue, distribution, departmental cost, comp-set index and guest-experience columns) + `portfolio_daily` view, nightly segment-aware `pg_cron` data generator, hardened read-only RPC (`run_hotel_analytics`) behind a privilege-restricted role
-- **API:** Supabase Edge Function `text-to-sql` (Deno) — CORS allow-list, per-IP rate limiting (20/hr), Gemini structured output, defense-in-depth SQL validation, one retry on HTTP 429 against a fallback model
+- **API:** Supabase Edge Function `text-to-sql` (Deno) — CORS allow-list, per-IP rate limiting (20/hr) plus a global 6 req/min cap, Gemini structured output, defense-in-depth SQL validation, one retry on HTTP 429 against a fallback model
 - **API request:** `{prompt, property_ids?}` — optional UUID list (≤50) scopes every generated query to the selected properties
 - **API response:** `{sql, chart, title, rows}` plus `caveat` and `duration_ms`
 - **Frontend:** Expo / React Native Web dashboard (dark/light theme toggle, property picker, KPI sections, answer-first layout (headline + AI findings summary with deterministic fallback) over bar/line/table, ranked/category bar charts, SQL accordion, CSV export) + victory charts, static export on Vercel

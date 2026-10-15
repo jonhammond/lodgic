@@ -13,6 +13,8 @@ import {
 } from "./summary_prompt.ts";
 
 const RATE_LIMIT_PER_HOUR = 20;
+// Each request makes up to 2 Gemini calls plus a fallback retry; 6/min keeps Flash-Lite under the 15 RPM free-tier cap.
+const GLOBAL_LIMIT_PER_MINUTE = 6;
 const MAX_PROMPT_CHARS = 500;
 const GEMINI_TIMEOUT_MS = 20_000;
 const RPC_TIMEOUT_MS = 10_000;
@@ -109,8 +111,9 @@ function errorResponse(
 async function hashIp(ip: string, salt: string): Promise<string> {
   const data = new TextEncoder().encode(`${salt}:${ip}`);
   const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
+  return Array.from(
+    new Uint8Array(digest),
+    (b) => b.toString(16).padStart(2, "0"),
   ).join("");
 }
 
@@ -305,13 +308,13 @@ async function handle(
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const salt = Deno.env.get("IP_HASH_SALT");
-  const geminiModel =
-    Deno.env.get("GEMINI_MODEL")?.trim() || DEFAULT_GEMINI_MODEL;
-  const geminiFallbackModel =
-    Deno.env.get("GEMINI_FALLBACK_MODEL")?.trim() ??
+  const geminiModel = Deno.env.get("GEMINI_MODEL")?.trim() ||
+    DEFAULT_GEMINI_MODEL;
+  const geminiFallbackModel = Deno.env.get("GEMINI_FALLBACK_MODEL")?.trim() ??
     DEFAULT_GEMINI_FALLBACK_MODEL;
-  console.info("Using Gemini model:", geminiModel);
-  console.info("Using Gemini fallback model:", geminiFallbackModel);
+  console.info(
+    `gemini model=${geminiModel} fallback=${geminiFallbackModel || "none"}`,
+  );
   if (!supabaseUrl || !serviceKey || !geminiKey || !salt) {
     console.error("missing required environment configuration");
     throw new ApiError(500, "server_misconfigured", "Server is not configured");
@@ -343,6 +346,20 @@ async function handle(
       "rate_limited",
       `Rate limit of ${RATE_LIMIT_PER_HOUR} queries per hour exceeded`,
     );
+  }
+  const { data: n, error: globalErr } = await supabase.rpc(
+    "count_queries_last_minute",
+  );
+  if (globalErr) {
+    console.error("count_queries_last_minute failed", globalErr.code);
+    throw new ApiError(
+      500,
+      "rate_limit_check_failed",
+      "Could not verify rate limit",
+    );
+  }
+  if (typeof n === "number" && n >= GLOBAL_LIMIT_PER_MINUTE) {
+    throw new ApiError(429, "busy", "Demo is busy, try again in a minute");
   }
   const { error: logErr } = await supabase.from("ai_query_log").insert({
     ip_hash: ipHash,
@@ -428,7 +445,13 @@ Deno.serve(async (req) => {
   try {
     return await handle(req, cors);
   } catch (e) {
-    if (e instanceof ApiError) return errorResponse(e, cors);
+    if (e instanceof ApiError) {
+      return errorResponse(
+        e,
+        cors,
+        e.code === "busy" ? { "Retry-After": "60" } : {},
+      );
+    }
     console.error(
       "unhandled error",
       e instanceof Error ? e.message : "unknown",
