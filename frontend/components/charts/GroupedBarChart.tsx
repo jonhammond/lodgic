@@ -5,7 +5,8 @@ import { formatByUnit, formatExact, GroupedSeries } from "../../lib/resultMappin
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
-import { LABEL_FONT, NARROW, NARROW_W, WIDE, wrapLabel } from "./CategoryBarChart";
+import { NARROW_W } from "./CategoryBarChart";
+import { LABEL_FONT, NARROW, WIDE, wrapLabel } from "./rows";
 import { niceDomain, tickLabel } from "./scale";
 
 const BAR_W = 12;

@@ -14,7 +14,7 @@ import type { ComboSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
-import { wrapLabel } from "./CategoryBarChart";
+import { wrapLabel } from "./rows";
 import { formatNumber, formatPercent } from "./format";
 import { niceCeil } from "./scale";
 
