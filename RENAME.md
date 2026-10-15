@@ -14,7 +14,7 @@ Order matters: deploy target + DNS first, portfolio merge last.
 - [x] `.serena/project.yml`: `project_name: "lodgic"`
 - [x] `supabase/config.toml`: `project_id = "lodgic"` (local CLI label only; hosted project unaffected)
 - [x] `grep -rniE innsight --exclude-dir=node_modules --exclude-dir=.git .` → empty (tracked files clean; remaining hits are ignored build/cache dirs: `frontend/dist`, `frontend/.expo`, `supabase/.temp`, `.remember`)
-- [ ] Commit on a branch, merge, push
+- [x] Commit on a branch, merge, push
 
 ## 2. GitHub
 
