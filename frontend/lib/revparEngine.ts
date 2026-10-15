@@ -43,17 +43,26 @@ export type Portfolio = {
 
 export type SortKey = "revpar" | "occupancy" | "adr" | "rooms" | "name";
 
+/** Dates in the timeframe window: `latestDate` for daily, else the latest `DAYS[tf]` distinct dates <= latestDate. */
+export function windowDates(dates: string[], timeframe: Timeframe, latestDate: string): Set<string> {
+  const distinct = [...new Set(dates)]
+    .filter((d) => d <= latestDate)
+    .sort()
+    .reverse();
+  return new Set(timeframe === "daily" ? [latestDate] : distinct.slice(0, DAYS[timeframe]));
+}
+
 export function baseInputs(
   rows: DailyRow[],
   properties: { id: string; name: string; total_rooms: number }[],
   timeframe: Timeframe,
   latestDate: string,
 ): PropertyBase[] {
-  const distinct = [...new Set(rows.map((r) => r.metric_date))]
-    .filter((d) => d <= latestDate)
-    .sort()
-    .reverse();
-  const window = new Set(timeframe === "daily" ? [latestDate] : distinct.slice(0, DAYS[timeframe]));
+  const window = windowDates(
+    rows.map((r) => r.metric_date),
+    timeframe,
+    latestDate,
+  );
   return properties.map((p) => {
     let sold = 0;
     let revenue = 0;
