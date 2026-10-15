@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { AnswerCard } from "./components/AnswerCard";
+import { CategoryBarChart } from "./components/charts/CategoryBarChart";
 import { MetricBarChart } from "./components/charts/MetricBarChart";
 import { Footer } from "./components/Footer";
 import { Grid } from "./components/Grid";
@@ -282,9 +283,13 @@ function AppInner() {
         >
           {mapped && mapped.charts.length > 0 ? (
             <Grid minWidth={280}>
-              {mapped.charts.map((s) => (
-                <MetricBarChart key={s.key} series={s} />
-              ))}
+              {mapped.charts.map((s) =>
+                s.kind === "category" ? (
+                  <CategoryBarChart key={s.key} series={s} />
+                ) : (
+                  <MetricBarChart key={s.key} series={s} />
+                ),
+              )}
             </Grid>
           ) : null}
           <Grid minWidth={340} alignStart>

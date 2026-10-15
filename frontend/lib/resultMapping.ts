@@ -25,6 +25,7 @@ export type ColorKey =
   | "guest";
 
 export type MetricSeries = {
+  kind: "time" | "category";
   key: string;
   title: string;
   note: string;
@@ -66,6 +67,11 @@ function unitFor(key: string): MetricUnit {
   return "number";
 }
 
+export function isAdditiveKey(key: string): boolean {
+  const u = unitFor(key);
+  return /revenue|cost|gop|rooms_sold|bookings|cancellations|rooms_cleaned|hours/i.test(key) && u !== "percent" && u !== "index";
+}
+
 export function formatByUnit(v: number, unit: MetricUnit): string {
   if (unit === "percent") return formatPercent(v);
   if (unit === "currency") return Math.abs(v) >= 1000 ? formatCompactCurrency(v) : formatCurrency(v);
@@ -85,8 +91,17 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
     if (rows.length !== 1) return empty;
     const row = rows[0];
     const k = Object.keys(row).find((c) => isNumeric(row[c]) && !isDateLike(row[c]));
+    const labelKey = Object.keys(row).find((c) => {
+      const v = row[c];
+      return typeof v === "string" && v.trim() !== "" && !isNumeric(v) && !isDateLike(v);
+    });
+    const value = k === undefined ? null : formatByUnit(toNumber(row[k]), unitFor(k as string));
     const summary =
-      k === undefined ? title : `${title}: ${formatByUnit(toNumber(row[k]), unitFor(k))}`;
+      value === null
+        ? title
+        : labelKey === undefined
+          ? `${title}: ${value}`
+          : `${title}: ${String(row[labelKey]).trim()} \u2014 ${value}`;
     return { summary, charts: [], table: null };
   }
 
@@ -114,6 +129,7 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
           ? (values[values.length - 1] / Math.max(1, now.getUTCDate())) * dim
           : null;
       return {
+        kind: "time",
         key,
         title: titleCase(key),
         note: partialLast ? `${monthLabel(xs[xs.length - 1])} MTD` : unit,
@@ -126,6 +142,33 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
       };
     });
     return { summary: title, charts, table: null };
+  }
+
+  if (rows.length >= 2 && rows.length <= 20 && !dated && yKeys.length >= 1) {
+    const labels = xs;
+    const charts = yKeys.map((key, i): MetricSeries => {
+      const unit = unitFor(key);
+      return {
+        kind: "category",
+        key,
+        title: titleCase(key),
+        note: unit,
+        labels,
+        values: rows.map((r) => (r[key] == null ? 0 : toNumber(r[key]))),
+        color: colorFor(key, i),
+        partialLast: false,
+        projection: null,
+        unit,
+      };
+    });
+    let summary = title;
+    if (charts.length === 1) {
+      const c = charts[0];
+      summary = isAdditiveKey(c.key)
+        ? `${title}: ${formatByUnit(c.values.reduce((a, b) => a + b, 0), c.unit)}`
+        : `${title}: ${c.labels[0]} \u2014 ${formatByUnit(c.values[0], c.unit)}`;
+    }
+    return { summary, charts, table: tableOf() };
   }
 
   return { summary: title, charts: [], table: tableOf() };

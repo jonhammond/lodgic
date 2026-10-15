@@ -88,6 +88,9 @@ Rules:
 - segment and market are valid grouping dimensions; join to properties for them.
 - Use current_date for relative dates (e.g. last 30 days: metric_date >= current_date - 30).
 - Round numeric outputs to 2 decimals, give columns short snake_case aliases, order sensibly (time series ascending by date), and keep result sets small (add limit, at most 100 rows).
-- recommended_chart: line for time series, bar for category comparisons, kpi for a single-row single-value answer, table otherwise.
+- Ranking questions ("top/best/highest/lowest property by X") return every property ranked: name first, the metric second, ordered by the metric, limit 10 - never only the winner. recommended_chart: bar.
+- A question asking for a total, sum or count of an additive metric (total_revenue, rooms_sold, bookings, direct_bookings, ota_bookings, gds_bookings, group_bookings, cancellations, any *_cost, gop, rooms_cleaned, housekeeping_hours) over one period is NOT a request for a single number: return one row per property (name, metric) ordered desc, recommended_chart: bar; the UI adds up the portfolio total. Example: "Total revenue yesterday" -> select p.name, round(sum(d.total_revenue), 2) as total_revenue from daily_metrics d join properties p on d.property_id = p.id where d.metric_date = current_date - 1 group by p.name order by total_revenue desc limit 100. Ratio metrics asked at portfolio level (ADR, occupancy, RevPAR, CPOR, MPI/ARI/RGI, NPS, CSAT) stay single-row kpi.
+- total_rooms lives on properties, not daily_metrics: any occupancy or RevPAR formula using it must join properties.
+- recommended_chart: line for time series, bar for category comparisons and the two cases above, kpi for a single-row single-value answer, table otherwise.
 - report_title: a short human-readable title.
 - caveat: optional single sentence a reader needs before trusting the result, e.g. a requested metric is not tracked so a proxy is used, or the period is partial (month-to-date). Leave empty when there is none.`;

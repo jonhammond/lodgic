@@ -11,29 +11,15 @@ import { formatByUnit, MetricSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
+import { niceCeil, tickLabel } from "./scale";
 import { pickTickValues } from "./ticks";
 
 const PLOT_H = 140;
 const PAD = { top: 6, bottom: 22, left: 48, right: 0 };
 
-// Short axis ticks: "$2.5M", "$200", "50%" — the full value lives in the table/answer.
-function tickLabel(v: number, unit: MetricSeries["unit"]): string {
-  if (unit === "percent") return `${Math.round(v)}%`;
-  if (unit === "currency") return Math.abs(v) >= 1000 ? formatByUnit(v, unit) : `$${Math.round(v)}`;
-  return formatByUnit(v, unit);
-}
 const HEIGHT = PLOT_H + PAD.top + PAD.bottom;
 const GAP = 5;
 const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
-
-// Smallest "nice" (1/2/2.5/5/10 x 10^k) value >= v.
-function niceCeil(v: number): number {
-  if (!(v > 0)) return 1;
-  const pow = Math.pow(10, Math.floor(Math.log10(v)));
-  const m = v / pow;
-  const step = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
-  return step * pow;
-}
 
 export function MetricBarChart({ series }: { series: MetricSeries }) {
   const { t } = useTheme();

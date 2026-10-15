@@ -10,7 +10,7 @@ Live demo: https://lodgic.jonhammond.org
 - **API:** Supabase Edge Function `text-to-sql` (Deno) — CORS allow-list, per-IP rate limiting (20/hr), Gemini structured output, defense-in-depth SQL validation, one retry on HTTP 429 against a fallback model
 - **API request:** `{prompt, property_ids?}` — optional UUID list (≤50) scopes every generated query to the selected properties
 - **API response:** `{sql, chart, title, rows}` plus `caveat` and `duration_ms`
-- **Frontend:** Expo / React Native Web dashboard (dark/light theme toggle, property picker, KPI sections, answer card with bar/line/table, SQL accordion, CSV export) + victory charts, static export on Vercel
+- **Frontend:** Expo / React Native Web dashboard (dark/light theme toggle, property picker, KPI sections, answer card with bar/line/table, ranked/category bar charts, SQL accordion, CSV export) + victory charts, static export on Vercel
 
 ## Local development
 

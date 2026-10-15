@@ -43,3 +43,17 @@ Deno.test("integer-column divisions in prompt formulas are cast to numeric", () 
     assert(!re.test(SYSTEM_PROMPT), `uncast integer division on ${col}`);
   }
 });
+
+Deno.test("ranking questions return every property, never only the winner", () => {
+  assert(
+    SYSTEM_PROMPT.includes("never only the winner"),
+    "missing ranking rule",
+  );
+});
+
+Deno.test("additive portfolio totals return one row per property", () => {
+  assert(
+    SYSTEM_PROMPT.includes("one row per property"),
+    "missing breakdown rule",
+  );
+});
