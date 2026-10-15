@@ -11,6 +11,7 @@ import { formatByUnit, MetricSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
+import { pickTickValues } from "./ticks";
 
 const PLOT_H = 140;
 const PAD = { top: 6, bottom: 22, left: 48, right: 0 };
@@ -23,6 +24,7 @@ function tickLabel(v: number, unit: MetricSeries["unit"]): string {
 }
 const HEIGHT = PLOT_H + PAD.top + PAD.bottom;
 const GAP = 5;
+const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
 
 // Smallest "nice" (1/2/2.5/5/10 x 10^k) value >= v.
 function niceCeil(v: number): number {
@@ -42,6 +44,7 @@ export function MetricBarChart({ series }: { series: MetricSeries }) {
   const plotW = Math.max(0, width - PAD.left - PAD.right);
   const barWidth = n > 0 ? Math.max(1, (plotW - GAP * (n - 1)) / n) : 1;
   const barColors = t.kpi[color];
+  const xTicks = pickTickValues(labels, plotW, X_TICK_FONT);
   const tickLabels = {
     fontFamily: fonts.mono400,
     fontSize: 10,
@@ -126,17 +129,24 @@ export function MetricBarChart({ series }: { series: MetricSeries }) {
               />
             )}
             <VictoryAxis
-              tickValues={values.map((_, i) => i + 1)}
+              tickValues={xTicks}
               tickFormat={(i: number) => labels[i - 1] ?? ""}
               style={{
                 axis: { stroke: t.border.axis, strokeWidth: 1 },
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: {
-                  fontFamily: fonts.sans400,
-                  fontSize: 10,
+                  ...X_TICK_FONT,
                   fill: t.text.dim,
                   padding: 6,
+                  // Keep the edge labels inside the plot: the last bar sits flush
+                  // against the right edge (PAD.right = 0), so anchor its label there.
+                  textAnchor: ({ index }: { index?: number | string }) =>
+                    Number(index) === xTicks.length - 1
+                      ? "end"
+                      : Number(index) === 0 && xTicks[0] === 1
+                        ? "start"
+                        : "middle",
                 },
               }}
             />
