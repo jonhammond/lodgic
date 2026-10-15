@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useMemo, useState, type ReactNode } from "react";
+import { Pressable, StyleSheet, Text, View, type PressableStateCallbackType } from "react-native";
 import {
   VictoryAxis,
   VictoryBar,
@@ -20,6 +20,7 @@ import { niceCeil } from "./scale";
 
 // Left gutter fits "100% (5.0)" in mono 10px; bottom fits two wrapped label lines.
 const PAD = { top: 10, bottom: 34, left: 66, right: 40 };
+const SELECTABLE_BOTTOM = 10;
 const NARROW_W = 360;
 const NARROW_PAD = { left: 58, right: 34 };
 const PLOT_H = 200;
@@ -32,14 +33,27 @@ const MAX_LABEL_CHARS = 14;
 
 type BarDatum = { x: number; y: number; raw: number; score: number };
 
+type Props = {
+  series: ComboSeries;
+  selectedIndex?: number | null;
+  /** When set, bars and the category label row become selectable controls. */
+  onSelect?: (i: number) => void;
+  /** Replaces the default header note. */
+  note?: string;
+  /** Rendered inside the card below the chart and label row. */
+  footer?: ReactNode;
+};
+
 /** CSAT as percent-of-5 bars on the left axis with the NPS score as a line on the right. */
-export function ScoreComboChart({ series }: { series: ComboSeries }) {
+export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, footer }: Props) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const { labels, bar, line } = series;
   const n = labels.length;
   const narrow = width > 0 && width < NARROW_W;
-  const pad = narrow ? { ...PAD, ...NARROW_PAD } : PAD;
+  const selectable = onSelect != null;
+  const basePad = narrow ? { ...PAD, ...NARROW_PAD } : PAD;
+  const pad = selectable ? { ...basePad, bottom: SELECTABLE_BOTTOM } : basePad;
   const plotW = Math.max(0, width - pad.left - pad.right);
   const height = PLOT_H + pad.top + pad.bottom;
   const barColor = t.kpi[bar.color];
@@ -84,7 +98,7 @@ export function ScoreComboChart({ series }: { series: ComboSeries }) {
           {series.title}
         </Text>
         <Text style={[styles.note, { color: t.text.subtle }]}>
-          {`% of 5-point ${bar.label} · ${line.label} -100..100`}
+          {note ?? `% of 5-point ${bar.label} · ${line.label} -100..100`}
         </Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
@@ -124,6 +138,21 @@ export function ScoreComboChart({ series }: { series: ComboSeries }) {
             />
             <VictoryBar
               name="bars"
+              events={
+                onSelect
+                  ? [
+                      {
+                        target: "data",
+                        eventHandlers: {
+                          onClick: (_: unknown, p: { datum: BarDatum }) => {
+                            onSelect(p.datum.x - 1);
+                            return [];
+                          },
+                        },
+                      },
+                    ]
+                  : undefined
+              }
               data={bars}
               barWidth={barWidth}
               cornerRadius={{ top: 2 }}
@@ -139,9 +168,17 @@ export function ScoreComboChart({ series }: { series: ComboSeries }) {
                 />
               }
               style={{
-                data: {
-                  fill: ({ active }: { active?: boolean }) => (active ? barColor.line : barColor.bar),
-                },
+                data: selectable
+                  ? {
+                      fill: ({ active, datum }: { active?: boolean; datum?: BarDatum }) =>
+                        active || selectedIndex === (datum?.x ?? 0) - 1 ? barColor.line : barColor.bar,
+                      fillOpacity: ({ datum }: { datum?: BarDatum }) =>
+                        selectedIndex != null && selectedIndex !== (datum?.x ?? 0) - 1 ? 0.55 : 1,
+                      cursor: "pointer",
+                    }
+                  : {
+                      fill: ({ active }: { active?: boolean }) => (active ? barColor.line : barColor.bar),
+                    },
               }}
             />
             <VictoryLine
@@ -165,7 +202,7 @@ export function ScoreComboChart({ series }: { series: ComboSeries }) {
             />
             <VictoryAxis
               tickValues={labels.map((_, i) => i + 1)}
-              tickFormat={(i: number) => names[i - 1] ?? ""}
+              tickFormat={(i: number) => (selectable ? "" : (names[i - 1] ?? ""))}
               tickLabelComponent={<VictoryLabel lineHeight={1.15} />}
               style={{
                 axis: { stroke: t.border.axis, strokeWidth: 1 },
@@ -177,6 +214,21 @@ export function ScoreComboChart({ series }: { series: ComboSeries }) {
           </VictoryChart>
         )}
       </View>
+      {selectable && n > 0 && width > 0 && (
+        <View style={styles.labelRow}>
+          <View style={{ width: pad.left }} />
+          {labels.map((label, i) => (
+            <LabelCell
+              key={`${i}-${label}`}
+              label={label ?? ""}
+              selected={selectedIndex === i}
+              underline={barColor.bar}
+              onPress={() => onSelect(i)}
+            />
+          ))}
+          <View style={{ width: pad.right }} />
+        </View>
+      )}
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.barKey, { backgroundColor: barColor.bar }]} />
@@ -191,7 +243,51 @@ export function ScoreComboChart({ series }: { series: ComboSeries }) {
           </Text>
         </View>
       </View>
+      {footer}
     </Card>
+  );
+}
+
+function LabelCell({
+  label,
+  selected,
+  underline,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  underline: string;
+  onPress: () => void;
+}) {
+  const { t } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Show ${label}`}
+      accessibilityState={{ selected }}
+      style={styles.labelCell}
+    >
+      {(state: PressableStateCallbackType) => {
+        const hovered = (state as PressableStateCallbackType & { hovered?: boolean }).hovered;
+        return (
+          <>
+            <Text
+              numberOfLines={2}
+              style={[
+                X_TICK_FONT,
+                styles.labelText,
+                { color: selected || hovered ? t.text.primary : t.text.dim },
+                hovered && !selected && styles.labelHover,
+              ]}
+            >
+              {label}
+            </Text>
+            <View style={[styles.labelUnderline, selected && { backgroundColor: underline }]} />
+          </>
+        );
+      }}
+    </Pressable>
   );
 }
 
@@ -206,6 +302,11 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: fonts.sans700, fontSize: 13, flexShrink: 1 },
   note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  labelRow: { flexDirection: "row" },
+  labelCell: { flex: 1, alignItems: "center", paddingTop: 6, paddingHorizontal: 2, cursor: "pointer" },
+  labelText: { textAlign: "center", lineHeight: 12 },
+  labelHover: { textDecorationLine: "underline" },
+  labelUnderline: { height: 2, alignSelf: "stretch", marginTop: 4, backgroundColor: "transparent" },
   legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 2, marginTop: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
   lineKey: { width: 16, height: 3, borderRadius: 2 },

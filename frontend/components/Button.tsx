@@ -6,7 +6,7 @@ type Props = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
-  variant?: "outline" | "primary";
+  variant?: "outline" | "primary" | "text";
 };
 
 export function Button({
@@ -17,6 +17,7 @@ export function Button({
 }: Props) {
   const { t } = useTheme();
   const primary = variant === "primary";
+  const text = variant === "text";
   return (
     <Pressable
       onPress={onPress}
@@ -30,15 +31,17 @@ export function Button({
           paddingHorizontal: 12,
           paddingVertical: 7,
           borderRadius: radius.button,
-          borderWidth: 1,
+          borderWidth: text ? 0 : 1,
           justifyContent: "center",
           alignItems: "center",
           opacity: disabled ? 0.5 : 1,
-          backgroundColor: primary
-            ? hovered
-              ? t.accent.blueHover
-              : t.accent.blue
-            : t.bg.button,
+          backgroundColor: text
+            ? "transparent"
+            : primary
+              ? hovered
+                ? t.accent.blueHover
+                : t.accent.blue
+              : t.bg.button,
           borderColor: primary
             ? hovered
               ? t.accent.blueHover
@@ -49,15 +52,28 @@ export function Button({
         };
       }}
     >
-      <Text
-        style={{
-          fontFamily: fonts.sans500,
-          fontSize: 13,
-          color: primary ? t.text.onAccent : t.text.primary,
-        }}
-      >
-        {label}
-      </Text>
+      {(state: PressableStateCallbackType) => {
+        const hovered = (
+          state as PressableStateCallbackType & { hovered?: boolean }
+        ).hovered;
+        return (
+          <Text
+            style={{
+              fontFamily: fonts.sans500,
+              fontSize: 13,
+              color: primary
+                ? t.text.onAccent
+                : text
+                  ? hovered || state.pressed
+                    ? t.text.primary
+                    : t.text.dim
+                  : t.text.primary,
+            }}
+          >
+            {label}
+          </Text>
+        );
+      }}
     </Pressable>
   );
 }
