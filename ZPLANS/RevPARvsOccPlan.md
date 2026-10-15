@@ -126,10 +126,20 @@ Validate with the dataviz script before committing:
 - `AGENTS.md`: Stack bullet — seed is now 10 properties × 90 days; Design bullet — add the RevPAR vs occupancy panel sentence (chip bypasses Gemini, client-side engine, twin-panel chart).
 - `.claude/skills/prompt-regress/questions.json` keeps the question (the Edge Function path still works for typed variants); no baseline change.
 
+## Revisions (2026-10-15, approved)
+
+1. `frontend/tsconfig.json`: add `"allowImportingTsExtensions": true`. Node 24 type stripping needs `import "./revparEngine.ts"` in the test file and `tsc` rejects that (TS5097) without the flag; the base config already sets `noEmit`.
+2. `RangeSlider.tsx`: `react-native-web` ships no type declarations, so do not import `unstable_createElement`. On `Platform.OS === "web"` render a plain `<input type="range">` JSX element (typed by the DOM lib + `@types/react`; react-native-web renders raw DOM children). Non-web fallback stays `−`/`+` buttons.
+3. `App.tsx`: `SUBMIT` clears `panel` (not only `SUCCESS`) so loading/error states in `AnswerCard` are visible after leaving the panel.
+4. `App.tsx`: the flash (`resultSeq`) and scroll-to-result effect key on `result ?? panel` so opening the panel flashes and scrolls like a query result.
+5. `RevparOccTable.tsx`: below `space.breakpoint` hide the Rooms column and render Tier as the coloured dot only (columns: Property, Occupancy, ADR, RevPAR, ●). Footer row follows.
+6. Palette validation: load the `dataviz` skill and run its `validate_palette.js` (do not hard-code the plugin temp path).
+7. Timeframe labels: control reads "Daily" / "30 days" / "Annualised"; subtitle reads "Latest day (<date>)" / "Last 30 days" / "Annualised from N days of data". Engine keys stay `daily | mtd | ytd`. CSV filename uses the key.
+
 ## Implementation steps
 
 0. Plan lives in `RevPARvsOccPlan.md` (this file).
-1. `lib/revparEngine.ts` + `lib/revparEngine.test.ts` (TDD, `node --test lib/revparEngine.test.ts`; Node 24 strips types natively). Cases: daily/mtd/ytd windows, truncated history, demand clamp at 100%, zero-sales ADR, portfolio weighting, tier cut-offs, sort stability. Add `"test": "node --test lib/*.test.ts"` to `package.json` scripts.
+1. `tsconfig.json` flag (rev. 1); `lib/revparEngine.ts` + `lib/revparEngine.test.ts` (TDD, `node --test lib/revparEngine.test.ts`; Node 24 strips types natively). Cases: daily/mtd/ytd windows, truncated history, demand clamp at 100%, zero-sales ADR, portfolio weighting, tier cut-offs, sort stability. Add `"test": "node --test lib/*.test.ts"` to `package.json` scripts.
 2. `lib/revparOcc.ts`: fetch + `isRevparOccQuestion`.
 3. `theme/tokens.ts` tier tokens; run the palette validator.
 4. `components/charts/rows.ts` extraction; `CategoryBarChart.tsx` imports it (`tsc` clean).
