@@ -12,6 +12,7 @@ import { formatByUnit, TrendSeries } from "../../lib/resultMapping";
 import { fonts, radius, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
+import { trendColor } from "./format";
 import { niceDomain, tickLabel } from "./scale";
 import { pickTickValues } from "./ticks";
 
@@ -29,7 +30,14 @@ const mean = (vs: (number | null)[]): number => {
   return nn.length ? nn.reduce((a, b) => a + b, 0) / nn.length : -Infinity;
 };
 
-export function TrendLineChart({ series }: { series: TrendSeries }) {
+type Props = {
+  series: TrendSeries;
+  /** Controlled pin: pass `null` for none. Omit to let the chart own the pin. */
+  selected?: string | null;
+  onSelect?: (name: string | null) => void;
+};
+
+export function TrendLineChart({ series, selected, onSelect }: Props) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const [tipW, setTipW] = useState(150);
@@ -37,7 +45,12 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
   const [hoverY, setHoverY] = useState<number | null>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [hoverName, setHoverName] = useState<string | null>(null);
-  const [pinned, setPinned] = useState<string | null>(null);
+  const [ownPinned, setOwnPinned] = useState<string | null>(null);
+  const pinned = selected === undefined ? ownPinned : selected;
+  const select = (name: string | null) => {
+    setOwnPinned(name);
+    onSelect?.(name);
+  };
 
   const { labels, unit, reference } = series;
   const n = labels.length;
@@ -49,8 +62,7 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
   const plotH = multi ? 280 : 180;
   const height = plotH + PAD.top + PAD.bottom;
 
-  const colorOf = (s: SeriesItem): string =>
-    multi ? (t.trend.ramp[s.order] ?? t.trend.mid) : t.kpi.market.line;
+  const colorOf = (s: SeriesItem): string => trendColor(t, s, multi);
 
   const { lo, hi, ticks: yTicks } = useMemo(() => {
     const all = series.series.flatMap((s) => s.values).filter((v): v is number => v !== null);
@@ -167,7 +179,8 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
       </View>
       <Pressable
         accessible={false}
-        onPress={() => setPinned(null)}
+        // Click on a line pins it; click on empty plot clears the pin.
+        onPress={() => select(nearName !== null && nearName !== pinned ? nearName : null)}
         onHoverOut={() => {
           setHoverIdx(null);
           setHoverY(null);
@@ -386,7 +399,7 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
                 accessibilityState={{ selected }}
                 onHoverIn={() => setHoverName(s.name)}
                 onHoverOut={() => setHoverName((c) => (c === s.name ? null : c))}
-                onPress={() => setPinned((c) => (c === s.name ? null : s.name))}
+                onPress={() => select(pinned === s.name ? null : s.name)}
                 style={(state: PressableStateCallbackType) => {
                   const hovered = (state as PressableStateCallbackType & { hovered?: boolean })
                     .hovered;

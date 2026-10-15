@@ -24,7 +24,7 @@ Hospitality analytics AI demo: natural-language questions → Gemini 3.1 Flash-L
 
 ## Design
 
-- Single-screen UI: PromptBar, PresetChips, ResultCanvas (kpi/bar/**trend line**/table, chosen by data shape in `frontend/lib/resultMapping.ts`), SqlAccordion. Multi-series trends use a ranked colour ramp (`theme.trend.ramp`, assigned by average rank) and long-format results render a week-grouped, collapsible table. Mobile-responsive (narrow iframe).
+- Single-screen UI: PromptBar, PresetChips, ResultCanvas (kpi/bar/**trend line**/table, chosen by data shape in `frontend/lib/resultMapping.ts`), SqlAccordion. Multi-series trends use a ranked colour ramp (`theme.trend.ramp`, assigned by average rank) and long-format results render a week-grouped, collapsible table. A long-format result carrying a rate plus its volume driver (ADR + rooms_sold, `PAIRS` in `resultMapping.ts`) renders as a `RateVolumePanel`: the selectable multi-line trend, then for the pinned (or only) property a `RateVolumeChart` combo (rooms-sold bars on a right axis, ADR line on the left). Mobile-responsive (narrow iframe).
 
 ## Claude Code automation
 

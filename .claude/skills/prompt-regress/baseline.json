@@ -1,18 +1,21 @@
 [
   {
-    "question": "Portfolio ADR, last 30 days",
-    "chart": "kpi",
-    "title": "Portfolio ADR (Last 30 Days)",
+    "question": "ADR by property, last 30 days",
+    "chart": "line",
+    "title": "ADR by Property (Last 30 Days)",
     "columns": [
-      "adr"
+      "adr",
+      "metric_date",
+      "name",
+      "rooms_sold"
     ],
-    "rowCount": 1,
+    "rowCount": 310,
     "error": null
   },
   {
     "question": "RevPAR vs occupancy",
     "chart": "kpi",
-    "title": "Portfolio RevPAR vs Occupancy",
+    "title": "Portfolio RevPAR vs Occupancy (Last 30 Days)",
     "columns": [
       "avg_occupancy",
       "avg_revpar"

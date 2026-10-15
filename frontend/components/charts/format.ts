@@ -1,4 +1,15 @@
+import type { Palette } from "../../theme/tokens";
+
 type Row = Record<string, unknown>;
+
+/** Series colour shared by the trend chart and its companions: ranked ramp when multi, market accent when single. */
+export function trendColor(
+  t: Palette,
+  s: { order: number },
+  multi: boolean,
+): string {
+  return multi ? (t.trend.ramp[s.order] ?? t.trend.mid) : t.kpi.market.line;
+}
 
 const NUM_RE = /^-?\d+(\.\d+)?$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
@@ -105,10 +116,25 @@ const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-/** "2026-08-23..." -> "Week ending Aug 23, 2026"; non-date strings pass through. */
-export function formatWeekEnding(iso: string): string {
+/** "2026-08-23..." -> "Aug 23, 2026"; non-date strings pass through. */
+export function formatLongDate(iso: string): string {
   if (!isDateLike(iso)) return iso;
   const m = MONTH_NAMES[Number(iso.slice(5, 7)) - 1];
   if (!m) return iso;
-  return `Week ending ${m} ${Number(iso.slice(8, 10))}, ${iso.slice(0, 4)}`;
+  return `${m} ${Number(iso.slice(8, 10))}, ${iso.slice(0, 4)}`;
+}
+
+/** "2026-08-23..." -> "Week ending Aug 23, 2026"; non-date strings pass through. */
+export function formatWeekEnding(iso: string): string {
+  const d = formatLongDate(iso);
+  return d === iso ? iso : `Week ending ${d}`;
+}
+
+/** True when every consecutive sorted date is exactly seven days apart (weekly buckets). */
+export function isWeeklySpacing(dates: string[]): boolean {
+  const ds = [...new Set(dates.filter(isDateLike))].sort();
+  if (ds.length < 2) return false;
+  return ds.every(
+    (d, i) => i === 0 || Date.parse(d.slice(0, 10)) - Date.parse(ds[i - 1].slice(0, 10)) === 7 * 86400000,
+  );
 }

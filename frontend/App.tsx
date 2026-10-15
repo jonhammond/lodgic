@@ -15,6 +15,7 @@ import { Platform, ScrollView, View } from "react-native";
 import { AnswerCard } from "./components/AnswerCard";
 import { CategoryBarChart } from "./components/charts/CategoryBarChart";
 import { MetricBarChart } from "./components/charts/MetricBarChart";
+import { RateVolumePanel } from "./components/charts/RateVolumePanel";
 import { TrendLineChart } from "./components/charts/TrendLineChart";
 import { Footer } from "./components/Footer";
 import { Grid } from "./components/Grid";
@@ -131,7 +132,7 @@ function reducer(s: State, a: Action): State {
 }
 
 const SUGGESTIONS = [
-  "Portfolio ADR, last 30 days",
+  "ADR by property, last 30 days",
   "RevPAR vs occupancy",
   "Top property by occupancy",
   "Revenue by property this month",
@@ -301,6 +302,7 @@ function AppInner() {
             onToggleSql={() => dispatch({ type: "TOGGLE_SQL" })}
             onResetRateLimit={() => dispatch({ type: "RESET_RATE_LIMIT" })}
           />
+          {mapped?.pair ? <RateVolumePanel key={resultSeq} pair={mapped.pair} /> : null}
           {mapped && mapped.charts.length > 0 ? (
             <Grid minWidth={mapped.charts.some((s) => s.kind === "trend") ? 480 : 280}>
               {mapped.charts.map((s) =>

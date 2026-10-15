@@ -4,7 +4,9 @@ import {
   formatCompactCurrency,
   formatCurrency,
   formatNumber,
+  formatLongDate,
   formatWeekEnding,
+  isWeeklySpacing,
   formatPercent,
   humanize,
   isNumeric,
@@ -87,6 +89,8 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
       }));
   })();
 
+  // Daily buckets read as plain dates; only seven-day spacing gets the "Week ending" label.
+  const weekly = isWeeklySpacing(groups.map((g) => g.key));
   const [expandedState, setExpanded] = useState<{ rows: typeof rows; set: Set<string> } | null>(null);
   // Reset to the newest group whenever the result set changes.
   const expanded =
@@ -225,7 +229,7 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                     >
                       <Text style={[styles.text, { color: t.text.dim }]}>{open ? "\u25be" : "\u25b8"}</Text>
                       <Text style={[styles.text, styles.bold, { color: t.text.primary }]}>
-                        {formatWeekEnding(g.key)}
+                        {weekly ? formatWeekEnding(g.key) : formatLongDate(g.key)}
                       </Text>
                       <Text
                         numberOfLines={1}

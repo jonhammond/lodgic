@@ -9,6 +9,7 @@ import {
   isDateLike,
   isNumeric,
   isPercentLikeKey,
+  isWeeklySpacing,
   monthLabel,
   toNumber,
   unitLabel,
@@ -50,10 +51,15 @@ export type TrendSeries = {
   reference: { y: number; label: string } | null;
 };
 
+/** A rate metric (ADR) paired with its volume driver (rooms sold): the UI renders the
+ *  rate as a selectable multi-line trend and, for the selected property, a bar+line combo. */
+export type RateVolumePair = { rate: TrendSeries; volume: TrendSeries };
+
 export type MappedResult = {
   headline: string;
   facts: string[];
   charts: (MetricSeries | TrendSeries)[];
+  pair: RateVolumePair | null;
   table: {
     columns: string[];
     rows: Record<string, unknown>[];
@@ -216,8 +222,20 @@ function rankSeries(
   }));
 }
 
+const PAIRS: { rate: RegExp; volume: RegExp }[] = [{ rate: /adr/i, volume: /rooms_sold/i }];
+
+function findPair(valueKeys: string[]): { rateKey: string; volumeKey: string } | null {
+  for (const p of PAIRS) {
+    const rateKey = valueKeys.find((k) => p.rate.test(k));
+    const volumeKey = valueKeys.find((k) => p.volume.test(k));
+    if (rateKey && volumeKey && rateKey !== volumeKey) return { rateKey, volumeKey };
+  }
+  return null;
+}
+
 function detectLongFormat(
   rows: Record<string, unknown>[],
+  minNames = 2,
 ): { dateKey: string; nameKey: string; valueKeys: string[] } | null {
   if (rows.length < 2) return null;
   const cols = Object.keys(rows[0]);
@@ -231,7 +249,7 @@ function detectLongFormat(
   );
   if (textCols.length !== 1) return null;
   const nameKey = textCols[0];
-  if (new Set(rows.map((r) => String(r[nameKey]).trim())).size < 2) return null;
+  if (new Set(rows.map((r) => String(r[nameKey]).trim())).size < minNames) return null;
   const valueKeys = cols.filter((k) => k !== dateKey && k !== nameKey && isNumCol(k));
   if (valueKeys.length < 1) return null;
   if (new Set(rows.map((r) => String(r[dateKey]))).size < 2) return null;
@@ -250,7 +268,7 @@ function tableFacts(rows: Record<string, unknown>[]): string[] {
 
 export function mapResult(result: QueryResult, now: Date = new Date()): MappedResult {
   const { rows, chart, title } = result;
-  const empty: MappedResult = { headline: title, facts: [], charts: [], table: null };
+  const empty: MappedResult = { headline: title, facts: [], charts: [], pair: null, table: null };
   if (rows.length === 0) return empty;
 
   if (chart === "kpi") {
@@ -268,12 +286,18 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         : labelKey === undefined
           ? `${title}: ${value}`
           : `${title}: ${String(row[labelKey]).trim()} \u2014 ${value}`;
-    return { headline, facts: [], charts: [], table: null };
+    return { headline, facts: [], charts: [], pair: null, table: null };
   }
 
   const tableOf = () => ({ columns: Object.keys(rows[0]), rows });
 
-  const long = detectLongFormat(rows);
+  // A single property still keeps the long-format shape when the result is a
+  // rate/volume pair, so the selectable trend and its companion chart render.
+  let long = detectLongFormat(rows);
+  if (!long) {
+    const one = detectLongFormat(rows, 1);
+    if (one && findPair(one.valueKeys)) long = one;
+  }
   if (long) {
     const { dateKey, nameKey, valueKeys } = long;
     const dates = [...new Set(rows.map((r) => String(r[dateKey])))].sort();
@@ -283,10 +307,8 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
     const labels = dates.map((d) =>
       monthlyLong ? monthLabel(d) : `${d.slice(5, 7)}/${d.slice(8, 10)}`,
     );
-    const weekly =
-      dates.length >= 2 &&
-      dates.every((d, i) => i === 0 || Date.parse(d.slice(0, 10)) - Date.parse(dates[i - 1].slice(0, 10)) === 7 * 86400000);
-    const charts = valueKeys.map((key): TrendSeries => {
+    const weekly = isWeeklySpacing(dates);
+    const all = valueKeys.map((key): TrendSeries => {
       const unit = unitFor(key);
       const byName = new Map(names.map((n) => [n, new Array<number | null>(dates.length).fill(null)]));
       for (const r of rows) {
@@ -305,14 +327,24 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         reference: unit === "index" ? { y: 100, label: "Market fair share" } : null,
       };
     });
+    const pairKeys = findPair(valueKeys);
+    const pair: RateVolumePair | null = pairKeys
+      ? {
+          rate: all.find((c) => c.key === pairKeys.rateKey)!,
+          volume: all.find((c) => c.key === pairKeys.volumeKey)!,
+        }
+      : null;
+    const charts = pair ? all.filter((c) => c !== pair.rate && c !== pair.volume) : all;
+    const lead = pair?.rate ?? all[0];
     const seriesOrder: Record<string, number> = {};
-    charts[0].series.forEach((s) => {
+    lead.series.forEach((s) => {
       seriesOrder[s.name] = s.order;
     });
     return {
       headline: title,
-      facts: trendFacts(charts[0]),
+      facts: lead.series.length >= 2 ? trendFacts(lead) : singleTrendFacts(lead),
       charts,
+      pair,
       table: { ...tableOf(), groupBy: dateKey, seriesOrder },
     };
   }
@@ -323,7 +355,7 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
   const xs = rows.map((r) => String(r[xKey] ?? ""));
   const dated = xs.every(isDateLike);
   if ((chart === "line" || dated) && rows.length > 1) {
-    if (yKeys.length === 0) return { headline: title, facts: tableFacts(rows), charts: [], table: tableOf() };
+    if (yKeys.length === 0) return { headline: title, facts: tableFacts(rows), charts: [], pair: null, table: tableOf() };
     const monthly = dated && xs.every((x) => x.slice(8, 10) === "01");
     const labels = xs.map((x) =>
       monthly ? monthLabel(x) : dated ? `${x.slice(5, 7)}/${x.slice(8, 10)}` : x,
@@ -373,6 +405,7 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
           ? singleTrendFacts(first)
           : timeFacts(first),
       charts,
+      pair: null,
       table: null,
     };
   }
@@ -403,8 +436,8 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
     }
     // A single-metric category chart carries exact labels and the total itself; a table would repeat it row for row.
     const table = charts.length === 1 ? null : tableOf();
-    return { headline, facts: categoryFacts(charts[0], xKey), charts, table };
+    return { headline, facts: categoryFacts(charts[0], xKey), charts, pair: null, table };
   }
 
-  return { headline: title, facts: tableFacts(rows), charts: [], table: tableOf() };
+  return { headline: title, facts: tableFacts(rows), charts: [], pair: null, table: tableOf() };
 }

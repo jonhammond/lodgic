@@ -50,7 +50,13 @@ export type Palette = {
     KpiColors
   >;
   table: { revenueBar: string; adrBar: string; heat: [string, string, string] };
-  trend: { ramp: readonly string[] | string[]; mid: string; reference: string };
+  trend: {
+    ramp: readonly string[] | string[];
+    mid: string;
+    reference: string;
+    volume: string;
+    volumeActive: string;
+  };
 };
 
 const accents = {
@@ -128,6 +134,8 @@ export const dark: Palette = {
     ramp: ["#34c98a", "#148c7a", "#62b4f0", "#3356c4", "#c0a8ff", "#7e3bb0", "#f58ab8", "#b5265f", "#ffa040", "#c44711"],
     mid: "#5b6670",
     reference: "#9aa4ad",
+    volume: "#4a5867",
+    volumeActive: "#6b7d90",
   },
 };
 
@@ -179,6 +187,8 @@ export const light: Palette = {
     ramp: ["#0f8a5a", "#26c4ac", "#1f6fb8", "#58a0ea", "#6a44c0", "#b07fe0", "#b82d78", "#e66fa6", "#b54d15", "#f08c3a"],
     mid: "#aab3bb",
     reference: "#7d8790",
+    volume: "#b4c1cd",
+    volumeActive: "#8a9cae",
   },
 };
 
