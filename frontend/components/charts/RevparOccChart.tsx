@@ -1,12 +1,28 @@
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { VictoryAxis, VictoryBar, VictoryChart, VictoryContainer, VictoryLabel, VictoryLine } from "victory";
+import {
+  VictoryAxis,
+  VictoryBar,
+  VictoryChart,
+  VictoryContainer,
+  VictoryLabel,
+  VictoryLine,
+} from "victory";
 import { PropertyCalc } from "../../lib/revparEngine";
 import { fonts } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { formatCurrency, formatPercent } from "./format";
-import { BAR_W, LABEL_FONT, NARROW, ROW_H, ROW_H_WRAPPED, VALUE_CHAR_W, WIDE, wrapLabel } from "./rows";
+import {
+  BAR_W,
+  LABEL_FONT,
+  NARROW,
+  ROW_H,
+  ROW_H_WRAPPED,
+  VALUE_CHAR_W,
+  WIDE,
+  wrapLabel,
+} from "./rows";
 import { niceDomain, tickLabel } from "./scale";
 
 export type RevparOccChartProps = {
@@ -19,7 +35,7 @@ export type RevparOccChartProps = {
 const STACK_W = 480;
 const SPLIT = 0.55;
 const LABEL_PAD = 12;
-const RIGHT_PAD_OCC = 52; // "100.0%" at mono 10px plus gap
+const RIGHT_PAD_OCC = 52 + Math.round(VALUE_CHAR_W * 4); // "100.0%" label plus tick margin
 
 export function RevparOccChart({ rows, target }: RevparOccChartProps) {
   const { t } = useTheme();
@@ -31,9 +47,15 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
   const rowH = names.some((s) => s.includes("\n")) ? ROW_H_WRAPPED : ROW_H;
   const pad = { top: 6, bottom: 22 };
   const height = n * rowH + pad.top + pad.bottom;
-  const revDomain = niceDomain(0, Math.max(0, target, ...rows.map((r) => r.revpar)), 4);
+  const revDomain = niceDomain(
+    0,
+    Math.max(0, target, ...rows.map((r) => r.revpar)),
+    4,
+  );
   const revText = rows.map((r) => formatCurrency(r.revpar));
-  const revRight = Math.ceil(Math.max(0, ...revText.map((s) => s.length)) * VALUE_CHAR_W + LABEL_PAD);
+  const revRight = Math.ceil(
+    Math.max(0, ...revText.map((s) => s.length)) * VALUE_CHAR_W + LABEL_PAD,
+  );
   // Victory draws x=1 at the bottom of a horizontal chart; invert so row 0 is on top.
   const x = (i: number) => n - i;
   const revData = rows.map((r, i) => ({ x: x(i), y: r.revpar, tier: r.tier }));
@@ -43,7 +65,9 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
     { x: n + 0.5, y: target },
   ];
 
-  const revW = stacked ? width : layout.left + Math.round((width - layout.left) * SPLIT);
+  const revW = stacked
+    ? width
+    : layout.left + Math.round((width - layout.left) * SPLIT);
   const occW = stacked ? width : width - revW;
   const occLeft = stacked ? layout.left : 8;
 
@@ -75,12 +99,23 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
           fill: t.text.tick,
           padding: 6,
           textAnchor: ({ index }: { index?: number | string }) =>
-            Number(index) === ticks.length - 1 ? "end" : Number(index) === 0 ? "start" : "middle",
+            Number(index) === ticks.length - 1
+              ? "end"
+              : Number(index) === 0
+                ? "start"
+                : "middle",
         },
       }}
     />
   );
-  const labelStyle = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.primary };
+  const labelStyle = {
+    fontFamily: fonts.mono400,
+    fontSize: 10,
+    fill: t.text.primary,
+    stroke: t.bg.card,
+    strokeWidth: 3,
+    paintOrder: "stroke",
+  };
 
   const legend: { color: string; text: string }[] = [
     { color: t.tier.above, text: "Above target" },
@@ -90,7 +125,10 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
 
   return (
     <Card style={styles.card}>
-      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={stacked ? undefined : styles.panels}>
+      <View
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        style={stacked ? undefined : styles.panels}
+      >
         {width > 0 && n > 0 && (
           <>
             <VictoryChart
@@ -103,7 +141,19 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
               containerComponent={<VictoryContainer responsive={false} />}
             >
               {nameAxis}
-              {valueAxis(stacked ? [0, revDomain.hi] : revDomain.ticks, (v) => tickLabel(v, "currency"))}
+              {valueAxis(stacked ? [0, revDomain.hi] : revDomain.ticks, (v) =>
+                tickLabel(v, "currency"),
+              )}
+              <VictoryLine
+                data={targetData}
+                style={{
+                  data: {
+                    stroke: t.text.primary,
+                    strokeWidth: 1,
+                    strokeDasharray: "4,3",
+                  },
+                }}
+              />
               <VictoryBar
                 data={revData}
                 barWidth={BAR_W}
@@ -112,15 +162,14 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
                 labelComponent={<VictoryLabel dx={4} textAnchor="start" />}
                 style={{
                   data: {
-                    fill: ({ datum }: { datum?: { tier: PropertyCalc["tier"] } }) =>
-                      datum ? t.tier[datum.tier] : t.tier.below,
+                    fill: ({
+                      datum,
+                    }: {
+                      datum?: { tier: PropertyCalc["tier"] };
+                    }) => (datum ? t.tier[datum.tier] : t.tier.below),
                   },
                   labels: labelStyle,
                 }}
-              />
-              <VictoryLine
-                data={targetData}
-                style={{ data: { stroke: t.text.primary, strokeWidth: 1, strokeDasharray: "4,3" } }}
               />
             </VictoryChart>
             <VictoryChart
@@ -132,21 +181,33 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
               domainPadding={0}
               containerComponent={<VictoryContainer responsive={false} />}
             >
-              {stacked ? nameAxis : (
+              {stacked ? (
+                nameAxis
+              ) : (
                 <VictoryAxis
                   tickValues={rows.map((_, i) => x(i))}
                   tickFormat={() => ""}
-                  style={{ axis: { stroke: "transparent" }, ticks: { stroke: "transparent" }, grid: { stroke: "none" } }}
+                  style={{
+                    axis: { stroke: "transparent" },
+                    ticks: { stroke: "transparent" },
+                    grid: { stroke: "none" },
+                  }}
                 />
               )}
-              {valueAxis(stacked ? [0, 1] : [0, 0.5, 1], (v) => `${Math.round(v * 100)}%`)}
+              {valueAxis(
+                stacked ? [0, 1] : [0, 0.5, 1],
+                (v) => `${Math.round(v * 100)}%`,
+              )}
               <VictoryBar
                 data={occData}
                 barWidth={BAR_W}
                 cornerRadius={{ top: 2 }}
                 labels={({ datum }) => formatPercent(datum.y * 100)}
                 labelComponent={<VictoryLabel dx={4} textAnchor="start" />}
-                style={{ data: { fill: t.trend.volume }, labels: labelStyle }}
+                style={{
+                  data: { fill: t.trend.volumeSolid },
+                  labels: labelStyle,
+                }}
               />
             </VictoryChart>
           </>
@@ -156,7 +217,9 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
         {legend.map((l) => (
           <View key={l.text} style={styles.legendItem}>
             <View style={[styles.swatch, { backgroundColor: l.color }]} />
-            <Text style={[styles.legendText, { color: t.text.secondary }]}>{l.text}</Text>
+            <Text style={[styles.legendText, { color: t.text.secondary }]}>
+              {l.text}
+            </Text>
           </View>
         ))}
       </View>

@@ -57,6 +57,7 @@ export type Palette = {
     reference: string;
     volume: string;
     volumeActive: string;
+    volumeSolid: string;
   };
 };
 
@@ -138,6 +139,7 @@ export const dark: Palette = {
     reference: "#9aa4ad",
     volume: "#4a5867",
     volumeActive: "#6b7d90",
+    volumeSolid: "#6b7d90",
   },
 };
 
@@ -192,6 +194,7 @@ export const light: Palette = {
     reference: "#7d8790",
     volume: "#b4c1cd",
     volumeActive: "#8a9cae",
+    volumeSolid: "#7f8c98",
   },
 };
 

@@ -26,6 +26,7 @@ export function RangeSlider({ label, value, min, max, step, format, onChange }: 
         <input
           type="range"
           aria-label={label}
+          name={label.toLowerCase().replace(/\W+/g, "-")}
           min={min}
           max={max}
           step={step}

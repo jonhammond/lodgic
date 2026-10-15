@@ -187,7 +187,7 @@ export function RevparOccPanel({ properties, selectedIds, onRowsChange }: Revpar
       </Text>
       {calc ? (
         <Text style={[styles.body, { color: t.text.secondary }]}>
-          {`Portfolio RevPAR ${formatCurrency(calc.portfolio.revpar)} at ${formatPercent(calc.portfolio.occupancy)} occupancy.`}
+          {`Portfolio RevPAR ${formatCurrency(calc.portfolio.revpar)} at ${formatPercent(calc.portfolio.occupancy * 100)} occupancy.`}
         </Text>
       ) : null}
       <View style={[styles.filters, wide ? styles.filtersWide : null]}>
