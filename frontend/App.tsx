@@ -10,7 +10,7 @@ import {
 } from "@expo-google-fonts/instrument-sans";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { AnswerCard } from "./components/AnswerCard";
 import { CategoryBarChart } from "./components/charts/CategoryBarChart";
@@ -28,10 +28,12 @@ import { QuestionPanel } from "./components/QuestionPanel";
 import { ResultBlock } from "./components/ResultBlock";
 import { PropertyPicker } from "./components/PropertyPicker";
 import { Rail } from "./components/Rail";
+import { RevparOccPanel } from "./components/revpar/RevparOccPanel";
 import { QueryError, QueryResult, runQuery } from "./lib/api";
 import { downloadCsv } from "./lib/csv";
 import { fetchKpis, KpiSnapshot } from "./lib/kpis";
 import { fetchProperties, Property } from "./lib/properties";
+import { isRevparOccQuestion } from "./lib/revparOcc";
 import { mapResult } from "./lib/resultMapping";
 import { readStored, writeStored } from "./lib/storage";
 import { space } from "./theme/tokens";
@@ -44,6 +46,7 @@ type State = {
   status: Status;
   errorMessage: string | null;
   result: QueryResult | null;
+  panel: "revparOcc" | null;
   sqlOpen: boolean;
   kpis: { status: "loading" | "ready" | "error"; data: KpiSnapshot | null };
   properties: Property[];
@@ -55,6 +58,7 @@ type State = {
 type Action =
   | { type: "SET_QUESTION"; question: string }
   | { type: "SUBMIT" }
+  | { type: "OPEN_PANEL" }
   | { type: "SUCCESS"; result: QueryResult }
   | { type: "FAIL"; message: string; code?: string }
   | { type: "TOGGLE_SQL" }
@@ -85,6 +89,7 @@ const initial: State = {
   status: "idle",
   errorMessage: null,
   result: null,
+  panel: null,
   sqlOpen: false,
   kpis: { status: "loading", data: null },
   properties: [],
@@ -98,9 +103,11 @@ function reducer(s: State, a: Action): State {
     case "SET_QUESTION":
       return { ...s, question: a.question };
     case "SUBMIT":
-      return { ...s, status: "loading", errorMessage: null };
+      return { ...s, status: "loading", errorMessage: null, panel: null };
+    case "OPEN_PANEL":
+      return { ...s, status: "idle", errorMessage: null, result: null, panel: "revparOcc" };
     case "SUCCESS":
-      return { ...s, status: "idle", errorMessage: null, result: a.result };
+      return { ...s, status: "idle", errorMessage: null, result: a.result, panel: null };
     case "FAIL":
       return {
         ...s,
@@ -170,7 +177,15 @@ function AppInner() {
     IBMPlexMono_500Medium,
   });
   const [state, dispatch] = useReducer(reducer, initial);
-  const { question, status, errorMessage, result, sqlOpen, kpis } = state;
+  const { question, status, errorMessage, result, panel, sqlOpen, kpis } = state;
+  const [panelExport, setPanelExport] = useState<{
+    rows: Record<string, unknown>[];
+    filename: string;
+  }>({ rows: [], filename: "" });
+  const onPanelRows = useCallback(
+    (rows: Record<string, unknown>[], filename: string) => setPanelExport({ rows, filename }),
+    [],
+  );
   const { properties, propertiesLoaded, selectedIds, pickerOpen } = state;
 
   const propertyIds =
@@ -211,18 +226,19 @@ function AppInner() {
   const resultY = useRef(0);
   const [resultSeq, setResultSeq] = useState(0);
   // Bump the flash key during render when a new result arrives (no effect-driven setState).
-  const [prevResult, setPrevResult] = useState(result);
-  if (result !== prevResult) {
-    setPrevResult(result);
-    if (result) setResultSeq((s) => s + 1);
+  const shown = result ?? panel;
+  const [prevShown, setPrevShown] = useState(shown);
+  if (shown !== prevShown) {
+    setPrevShown(shown);
+    if (shown) setResultSeq((s) => s + 1);
   }
   useEffect(() => {
-    if (!result) return;
+    if (!shown) return;
     const id = requestAnimationFrame(() =>
       scrollRef.current?.scrollTo({ y: Math.max(0, resultY.current - 12), animated: true }),
     );
     return () => cancelAnimationFrame(id);
-  }, [result]);
+  }, [shown]);
 
   if (!fontsLoaded) {
     return <View style={{ flex: 1, backgroundColor: t.bg.page }} />;
@@ -236,6 +252,10 @@ function AppInner() {
       return;
     }
     dispatch({ type: "SET_QUESTION", question: text });
+    if (isRevparOccQuestion(text)) {
+      dispatch({ type: "OPEN_PANEL" });
+      return;
+    }
     dispatch({ type: "SUBMIT" });
     try {
       dispatch({ type: "SUCCESS", result: await runQuery(text, propertyIds) });
@@ -273,8 +293,14 @@ function AppInner() {
           sqlOpen={sqlOpen}
           canToggleSql={!!result}
           onToggleSql={() => dispatch({ type: "TOGGLE_SQL" })}
-          canExport={!!result?.rows.length && Platform.OS === "web"}
-          onExport={() => result && downloadCsv(result.rows, `${slug(result.title)}.csv`)}
+          canExport={
+            Platform.OS === "web" && (panel ? panelExport.rows.length > 0 : !!result?.rows.length)
+          }
+          onExport={() =>
+            panel
+              ? downloadCsv(panelExport.rows, panelExport.filename)
+              : result && downloadCsv(result.rows, `${slug(result.title)}.csv`)
+          }
         />
         <QuestionPanel
           value={question}
@@ -290,47 +316,57 @@ function AppInner() {
             resultY.current = y;
           }}
         >
-          <AnswerCard
-            status={status}
-            headline={mapped?.headline ?? null}
-            findings={result?.summary ?? null}
-            facts={mapped?.facts ?? []}
-            caveat={result?.caveat ?? null}
-            errorMessage={errorMessage}
-            rowCount={result?.rows.length ?? null}
-            durationMs={result?.duration_ms ?? null}
-            sql={result?.sql ?? null}
-            sqlOpen={sqlOpen}
-            onToggleSql={() => dispatch({ type: "TOGGLE_SQL" })}
-            onResetRateLimit={() => dispatch({ type: "RESET_RATE_LIMIT" })}
-          />
-          {mapped?.pair ? <RateVolumePanel key={resultSeq} pair={mapped.pair} /> : null}
-          {mapped && mapped.charts.length > 0 ? (
-            <Grid minWidth={mapped.charts.some((s) => s.kind === "trend" || s.kind === "combo") ? 480 : 280}>
-              {mapped.charts.map((s) =>
-                s.kind === "trend" ? (
-                  <TrendLineChart key={s.key} series={s} />
-                ) : s.kind === "category" ? (
-                  <CategoryBarChart key={s.key} series={s} />
-                ) : s.kind === "grouped" ? (
-                  <GroupedBarChart key={s.key} series={s} />
-                ) : s.kind === "combo" ? (
-                  <ScoreComboChart key={s.key} series={s} />
-                ) : (
-                  <MetricBarChart key={s.key} series={s} />
-                ),
-              )}
-            </Grid>
-          ) : null}
-          {mapped?.table && result ? (
-            <PropertyTable
-              title={result.title}
-              columns={mapped.table.columns}
-              rows={mapped.table.rows}
-              groupBy={mapped.table.groupBy}
-              seriesOrder={mapped.table.seriesOrder}
+          {panel ? (
+            <RevparOccPanel
+              properties={properties}
+              selectedIds={selectedIds}
+              onRowsChange={onPanelRows}
             />
-          ) : null}
+          ) : (
+            <>
+            <AnswerCard
+              status={status}
+              headline={mapped?.headline ?? null}
+              findings={result?.summary ?? null}
+              facts={mapped?.facts ?? []}
+              caveat={result?.caveat ?? null}
+              errorMessage={errorMessage}
+              rowCount={result?.rows.length ?? null}
+              durationMs={result?.duration_ms ?? null}
+              sql={result?.sql ?? null}
+              sqlOpen={sqlOpen}
+              onToggleSql={() => dispatch({ type: "TOGGLE_SQL" })}
+              onResetRateLimit={() => dispatch({ type: "RESET_RATE_LIMIT" })}
+            />
+            {mapped?.pair ? <RateVolumePanel key={resultSeq} pair={mapped.pair} /> : null}
+            {mapped && mapped.charts.length > 0 ? (
+              <Grid minWidth={mapped.charts.some((s) => s.kind === "trend" || s.kind === "combo") ? 480 : 280}>
+                {mapped.charts.map((s) =>
+                  s.kind === "trend" ? (
+                    <TrendLineChart key={s.key} series={s} />
+                  ) : s.kind === "category" ? (
+                    <CategoryBarChart key={s.key} series={s} />
+                  ) : s.kind === "grouped" ? (
+                    <GroupedBarChart key={s.key} series={s} />
+                  ) : s.kind === "combo" ? (
+                    <ScoreComboChart key={s.key} series={s} />
+                  ) : (
+                    <MetricBarChart key={s.key} series={s} />
+                  ),
+                )}
+              </Grid>
+            ) : null}
+            {mapped?.table && result ? (
+              <PropertyTable
+                title={result.title}
+                columns={mapped.table.columns}
+                rows={mapped.table.rows}
+                groupBy={mapped.table.groupBy}
+                seriesOrder={mapped.table.seriesOrder}
+              />
+            ) : null}
+            </>
+          )}
         </ResultBlock>
         <KpiSections snapshot={kpis.data} loading={kpis.status === "loading"} />
         <Footer />
