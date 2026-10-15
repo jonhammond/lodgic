@@ -40,12 +40,6 @@ Order matters: deploy target + DNS first, portfolio merge last.
 ## 5. Portfolio (`~/Code/jonhammond.github.io`)
 
 - [x] Retake screenshot at the same crop as the current `assets/lodgic.png`, overwrite it
-- [ ] Commit the rename on `dev`
-- [ ] Merge `dev` → `master` only after §3–4 are green (deploys to production)
-- [ ] Verify live card: image loads, title `lodgic`, both buttons resolve
-
-## 6. Brand hygiene
-
-- [ ] Trademark search (USPTO TESS) for "Lodgic" in software/analytics classes
-- [ ] Check `lodgic.ai` / `lodgic.app` / `lodgic.com` availability; register if cheap
-- [ ] Update any LinkedIn/résumé mentions of InnSights
+- [x] Commit the rename on `dev`
+- [x] Merge `dev` → `master` only after §3–4 are green (deploys to production)
+- [x] Verify live card: image loads, title `lodgic`, both buttons resolve
