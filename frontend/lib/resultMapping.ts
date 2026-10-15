@@ -55,10 +55,21 @@ export type TrendSeries = {
  *  rate as a selectable multi-line trend and, for the selected property, a bar+line combo. */
 export type RateVolumePair = { rate: TrendSeries; volume: TrendSeries };
 
+/** 2-3 same-unit metrics over one category axis (CPOR vs ADR by property): one grouped bar chart. */
+export type GroupedSeries = {
+  kind: "grouped";
+  key: string;
+  title: string;
+  note: string;
+  unit: MetricUnit;
+  labels: string[];
+  series: { key: string; title: string; values: number[]; color: ColorKey }[];
+};
+
 export type MappedResult = {
   headline: string;
   facts: string[];
-  charts: (MetricSeries | TrendSeries)[];
+  charts: (MetricSeries | TrendSeries | GroupedSeries)[];
   pair: RateVolumePair | null;
   table: {
     columns: string[];
@@ -128,6 +139,30 @@ function timeFacts(c: Pick<MetricSeries, "values" | "labels" | "unit">): string[
     `${fmt(v[0])} on ${lbl(c.labels[0])} to ${fmt(v[last])} on ${lbl(c.labels[last])}${pct}.`,
     `Peak ${fmt(v[hi])} on ${lbl(c.labels[hi])}; low ${fmt(v[lo])} on ${lbl(c.labels[lo])}.`,
   ];
+}
+
+/** 2-3 category metrics sharing a currency or percent unit collapse into one grouped bar chart;
+ *  mixed units and plain numbers keep one panel per metric plus the table. */
+function groupSameUnit(charts: MetricSeries[], title: string): GroupedSeries | null {
+  if (charts.length < 2 || charts.length > 3) return null;
+  const unit = charts[0].unit;
+  if (unit !== "currency" && unit !== "percent") return null;
+  if (!charts.every((c) => c.unit === unit)) return null;
+  const used: ColorKey[] = [];
+  const series = charts.map((c) => {
+    const color = used.includes(c.color) ? (COLORS.find((k) => !used.includes(k)) ?? c.color) : c.color;
+    used.push(color);
+    return { key: c.key, title: c.title, values: c.values, color };
+  });
+  return {
+    kind: "grouped",
+    key: charts.map((c) => c.key).join("+"),
+    title,
+    note: unitLabel(unit),
+    unit,
+    labels: charts[0].labels,
+    series,
+  };
 }
 
 function categoryFacts(c: MetricSeries, xKey: string): string[] {
@@ -427,6 +462,16 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         unit,
       };
     });
+    const grouped = groupSameUnit(charts, title);
+    if (grouped) {
+      return {
+        headline: title,
+        facts: charts.flatMap((c) => categoryFacts(c, xKey).slice(0, 1)),
+        charts: [grouped],
+        pair: null,
+        table: null,
+      };
+    }
     let headline = title;
     if (charts.length === 1) {
       const c = charts[0];

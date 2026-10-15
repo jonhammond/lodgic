@@ -10,12 +10,12 @@ import { niceDomain, tickLabel } from "./scale";
 const ROW_H = 26;
 const ROW_H_WRAPPED = 36;
 const BAR_W = 16;
-const NARROW_W = 360;
-const LABEL_FONT = { fontFamily: fonts.sans400, fontSize: 11 };
+export const NARROW_W = 360;
+export const LABEL_FONT = { fontFamily: fonts.sans400, fontSize: 11 };
 const VALUE_CHAR_W = 6.2; // mono 10px advance
 // Name-axis budget: chars per line and the gutter that fits them.
-const WIDE = { chars: 26, left: 170 };
-const NARROW = { chars: 18, left: 122 };
+export const WIDE = { chars: 26, left: 170 };
+export const NARROW = { chars: 18, left: 122 };
 // Lightest step of the single-hue ramp; the max bar is the full hue.
 // 0.9 keeps the smallest revenue bar >= 3:1 on both panels (dark blueFocus on #262d33 = 3.09, light blue on #fff = 4.96).
 const MIN_ALPHA = 0.9;

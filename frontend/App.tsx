@@ -14,6 +14,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { AnswerCard } from "./components/AnswerCard";
 import { CategoryBarChart } from "./components/charts/CategoryBarChart";
+import { GroupedBarChart } from "./components/charts/GroupedBarChart";
 import { MetricBarChart } from "./components/charts/MetricBarChart";
 import { RateVolumePanel } from "./components/charts/RateVolumePanel";
 import { TrendLineChart } from "./components/charts/TrendLineChart";
@@ -310,6 +311,8 @@ function AppInner() {
                   <TrendLineChart key={s.key} series={s} />
                 ) : s.kind === "category" ? (
                   <CategoryBarChart key={s.key} series={s} />
+                ) : s.kind === "grouped" ? (
+                  <GroupedBarChart key={s.key} series={s} />
                 ) : (
                   <MetricBarChart key={s.key} series={s} />
                 ),

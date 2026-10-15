@@ -41,7 +41,7 @@ Deno is not installed on the host; run `deno check/test/lint/fmt` for the Edge F
 - **Rate + volume pair** (long format whose numeric columns include ADR and rooms_sold, e.g. "ADR by property, last 30 days"; a single property also qualifies) renders the ADR trend with selectable lines and, for the pinned or only property, a combo chart: rooms-sold bars on a right-hand axis under the ADR line.
 - **Single-series index trend** (dated rows with an MPI/ARI/RGI column) renders as a single trend line with the reference line.
 - **Other dated rows** render one bar chart per metric (ADR, revenue, occupancy, ...).
-- **Categorical rows** (2-20 rows, no date) render ranked/category bars; everything else falls back to the table.
+- **Categorical rows** (2-20 rows, no date) render ranked/category bars; 2-3 metrics sharing a currency or percent unit (CPOR vs ADR) render as one grouped bar chart with a legend and no table; everything else falls back to the table.
 
 ## Status
 
