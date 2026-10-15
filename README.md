@@ -1,6 +1,6 @@
 # lodgic
 
-Hospitality analytics demo: ask natural-language questions about a synthetic hotel portfolio; Gemini 2.5 Flash-Lite converts them to SQL, Supabase executes them read-only, and a dashboard renders live KPI tiles (with sparklines), charts, and tables.
+Hospitality analytics demo: ask natural-language questions about a synthetic hotel portfolio; Gemini 3.5 Flash-Lite converts them to SQL, Supabase executes them read-only, and a dashboard renders live KPI tiles (with sparklines), charts, and tables.
 
 Live demo: https://lodgic.jonhammond.org
 
@@ -23,7 +23,7 @@ supabase functions serve text-to-sql --env-file supabase/functions/.env
 cd frontend && npm install && npx expo start --web   # http://localhost:8081
 ```
 
-`supabase/functions/.env` (gitignored) needs `GEMINI_API_KEY` and `IP_HASH_SALT`; see `supabase/functions/.env.example`. Optional: `ALLOWED_ORIGINS` (comma-separated CORS origins beyond localhost defaults), `GEMINI_MODEL` (default `gemini-2.5-flash-lite`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.1-flash-lite`; empty disables the 429 retry).
+`supabase/functions/.env` (gitignored) needs `GEMINI_API_KEY` and `IP_HASH_SALT`; see `supabase/functions/.env.example`. Optional: `ALLOWED_ORIGINS` (comma-separated CORS origins beyond localhost defaults), `GEMINI_MODEL` (default `gemini-3.5-flash-lite`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.1-flash-lite`; empty disables the 429 retry).
 
 ```bash
 curl -s -X POST http://127.0.0.1:54321/functions/v1/text-to-sql \

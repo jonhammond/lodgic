@@ -10,7 +10,7 @@
   },
   "permissions": {
     "allow": [
-      "Bash(docker run --rm -v * denoland/deno:*)",
+      "Bash(docker run --rm -v * denoland/deno:latest *)",
       "Bash(npx tsc --noEmit:*)",
       "Bash(npx expo lint:*)",
       "Bash(npx eslint:*)",

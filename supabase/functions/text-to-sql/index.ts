@@ -20,7 +20,7 @@ const GLOBAL_LIMIT_PER_MINUTE = 6;
 const MAX_PROMPT_CHARS = 500;
 const GEMINI_TIMEOUT_MS = 20_000;
 const RPC_TIMEOUT_MS = 10_000;
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite";
 
 function geminiUrl(model: string): string {
