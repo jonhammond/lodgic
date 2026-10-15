@@ -84,3 +84,15 @@ export function monthLabel(dateStr: string): string {
 export function isPercentLikeKey(key: string): boolean {
   return /occ|pct|percent|rate|ratio|share/i.test(key);
 }
+
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** "2026-08-23..." -> "Week ending Aug 23, 2026"; non-date strings pass through. */
+export function formatWeekEnding(iso: string): string {
+  if (!isDateLike(iso)) return iso;
+  const m = MONTH_NAMES[Number(iso.slice(5, 7)) - 1];
+  if (!m) return iso;
+  return `Week ending ${m} ${Number(iso.slice(8, 10))}, ${iso.slice(0, 4)}`;
+}

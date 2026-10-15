@@ -310,7 +310,13 @@ function AppInner() {
             </Grid>
           ) : null}
           {mapped?.table && result ? (
-            <PropertyTable title={result.title} columns={mapped.table.columns} rows={mapped.table.rows} />
+            <PropertyTable
+              title={result.title}
+              columns={mapped.table.columns}
+              rows={mapped.table.rows}
+              groupBy={mapped.table.groupBy}
+              seriesOrder={mapped.table.seriesOrder}
+            />
           ) : null}
         </ResultBlock>
         <KpiSections snapshot={kpis.data} loading={kpis.status === "loading"} />

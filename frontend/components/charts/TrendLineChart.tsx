@@ -15,14 +15,14 @@ import { Card } from "../Card";
 import { niceDomain, tickLabel } from "./scale";
 import { pickTickValues } from "./ticks";
 
-const PLOT_H = 180;
 const PAD = { top: 10, bottom: 22, left: 40, right: 52 };
 const NARROW_W = 360;
 const NARROW_RIGHT = 8;
 const END_LABEL_MIN_GAP = 12;
 const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
 
-type Rank = TrendSeries["series"][number]["rank"];
+type SeriesItem = TrendSeries["series"][number];
+const HIT_PX = 14;
 
 const mean = (vs: (number | null)[]): number => {
   const nn = vs.filter((v): v is number => v !== null);
@@ -33,6 +33,8 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const [tipW, setTipW] = useState(150);
+  const [tipH, setTipH] = useState(0);
+  const [hoverY, setHoverY] = useState<number | null>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [hoverName, setHoverName] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
@@ -42,38 +44,25 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
   const narrow = width > 0 && width < NARROW_W;
   const padRight = narrow ? NARROW_RIGHT : PAD.right;
   const pad = { ...PAD, right: padRight };
-  const height = PLOT_H + PAD.top + PAD.bottom;
   const plotW = Math.max(0, width - PAD.left - padRight);
   const multi = series.series.length >= 2;
-  const focus = pinned ?? hoverName;
+  const plotH = multi ? 280 : 180;
+  const height = plotH + PAD.top + PAD.bottom;
 
-  const colorOf = (rank: Rank): string =>
-    !multi
-      ? t.kpi.market.line
-      : rank === "top"
-        ? t.trend.top
-        : rank === "bottom"
-          ? t.trend.bottom
-          : t.trend.mid;
+  const colorOf = (s: SeriesItem): string =>
+    multi ? (t.trend.ramp[s.order] ?? t.trend.mid) : t.kpi.market.line;
 
   const { lo, hi, ticks: yTicks } = useMemo(() => {
     const all = series.series.flatMap((s) => s.values).filter((v): v is number => v !== null);
     if (reference) all.push(reference.y);
     if (all.length === 0) return niceDomain(0, 1);
-    return niceDomain(Math.min(...all), Math.max(...all));
-  }, [series, reference]);
+    return niceDomain(Math.min(...all), Math.max(...all), multi ? 6 : 4);
+  }, [series, reference, multi]);
 
   const byAvg = useMemo(
     () => [...series.series].sort((a, b) => mean(b.values) - mean(a.values)),
     [series],
   );
-
-  // Draw order: field, then top/bottom, then the focused line on top.
-  const drawOrder = useMemo(() => {
-    const weight = (s: TrendSeries["series"][number]) =>
-      s.name === focus ? 2 : s.rank === "mid" ? 0 : 1;
-    return [...series.series].sort((a, b) => weight(a) - weight(b));
-  }, [series, focus]);
 
   const xTicks = pickTickValues(labels, plotW, X_TICK_FONT);
   const tickLabels = {
@@ -83,7 +72,32 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
     padding: 6,
   };
 
-  const yPx = (v: number) => PAD.top + ((hi - v) / (hi - lo)) * PLOT_H;
+  const yPx = (v: number) => PAD.top + ((hi - v) / (hi - lo)) * plotH;
+
+  const nearName = useMemo(() => {
+    if (!multi || hoverIdx === null || hoverY === null) return null;
+    let best: string | null = null;
+    let bestD = HIT_PX + 1;
+    for (const s of series.series) {
+      const v = s.values[hoverIdx - 1];
+      if (v == null) continue;
+      const d = Math.abs(yPx(v) - hoverY);
+      if (d < bestD) {
+        bestD = d;
+        best = s.name;
+      }
+    }
+    return bestD <= HIT_PX ? best : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [series, multi, hoverIdx, hoverY, lo, hi, plotH]);
+  const focus = pinned ?? hoverName ?? nearName;
+
+  // Draw order: field, then top/bottom, then the focused line on top.
+  const drawOrder = useMemo(() => {
+    const weight = (s: SeriesItem) =>
+      s.name === focus ? 2 : s.rank === "mid" ? 0 : 1;
+    return [...series.series].sort((a, b) => weight(a) - weight(b));
+  }, [series, focus]);
 
   // End markers for top/bottom only; nudge apart when their labels would collide.
   const ends = useMemo(() => {
@@ -118,6 +132,13 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
   }, [series, hoverIdx]);
 
   const crossX = hoverIdx === null ? 0 : PAD.left + (n > 1 ? ((hoverIdx - 1) / (n - 1)) * plotW : 0);
+  const tipTop =
+    tipH > plotH
+      ? PAD.top
+      : Math.min(
+          Math.max((hoverY ?? PAD.top) - tipH / 2, PAD.top),
+          PAD.top + plotH - tipH,
+        );
   const tipLeft = Math.max(
     0,
     Math.min(
@@ -130,9 +151,9 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
     const focused = s.name === focus;
     const dim = focus !== null && !focused;
     return {
-      stroke: colorOf(s.rank),
-      strokeWidth: focused ? 3 : s.rank === "mid" && multi ? 1.5 : 2,
-      opacity: dim ? 0.25 : s.rank === "mid" && multi && focus === null ? 0.9 : 1,
+      stroke: colorOf(s),
+      strokeWidth: focused ? 3 : 2,
+      opacity: dim ? 0.35 : 1,
       strokeLinejoin: "round" as const,
       strokeLinecap: "round" as const,
     };
@@ -147,7 +168,14 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
       <Pressable
         accessible={false}
         onPress={() => setPinned(null)}
-        onHoverOut={() => setHoverIdx(null)}
+        onHoverOut={() => {
+          setHoverIdx(null);
+          setHoverY(null);
+        }}
+        {...({
+          onPointerMove: (e: { nativeEvent: unknown }) =>
+            setHoverY((e.nativeEvent as { offsetY?: number }).offsetY ?? null),
+        } as object)}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       >
         {width > 0 && n > 0 && (
@@ -252,7 +280,7 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
                     />
                   }
                   style={{
-                    data: { fill: colorOf(e.s.rank), stroke: t.bg.card, strokeWidth: 2 },
+                    data: { fill: colorOf(e.s), stroke: t.bg.card, strokeWidth: 2 },
                   }}
                 />
               ))}
@@ -264,7 +292,7 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
                   data={[{ x: e.x, y: e.y }]}
                   size={4}
                   style={{
-                    data: { fill: colorOf(e.s.rank), stroke: t.bg.card, strokeWidth: 2 },
+                    data: { fill: colorOf(e.s), stroke: t.bg.card, strokeWidth: 2 },
                   }}
                 />
               ))}
@@ -281,7 +309,7 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
             {hoverIdx !== null && (
               <VictoryScatter
                 name="dots"
-                data={hoverRows.map((r) => ({ x: hoverIdx, y: r.v, color: colorOf(r.s.rank) }))}
+                data={hoverRows.map((r) => ({ x: hoverIdx, y: r.v, color: colorOf(r.s) }))}
                 size={3}
                 style={{
                   data: {
@@ -297,29 +325,50 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
         {hoverIdx !== null && hoverRows.length > 0 && (
           <View
             pointerEvents="none"
-            onLayout={(e) => setTipW(e.nativeEvent.layout.width)}
+            onLayout={(e) => {
+              setTipW(e.nativeEvent.layout.width);
+              setTipH(e.nativeEvent.layout.height);
+            }}
             style={[
               styles.tip,
               {
                 left: tipLeft,
-                top: PAD.top,
+                top: tipTop,
                 backgroundColor: t.bg.panel,
                 borderColor: t.border.strong,
               },
             ]}
           >
             <Text style={[styles.tipHead, { color: t.text.subtle }]}>{labels[hoverIdx - 1]}</Text>
-            {hoverRows.map(({ s, v }) => (
-              <View key={s.name} style={styles.tipRow}>
-                <View style={[styles.tipKey, { backgroundColor: colorOf(s.rank) }]} />
-                <Text style={[styles.tipName, { color: t.text.secondary }]} numberOfLines={1}>
-                  {s.name}
-                </Text>
-                <Text style={[styles.tipVal, { color: t.text.primary }]}>
-                  {formatByUnit(v, unit)}
-                </Text>
-              </View>
-            ))}
+            {hoverRows.map(({ s, v }) => {
+              const f = multi && s.name === focus;
+              return (
+                <View key={s.name} style={styles.tipRow}>
+                  <View
+                    style={[styles.tipKey, { backgroundColor: colorOf(s), height: f ? 3 : 2 }]}
+                  />
+                  <Text
+                    style={[
+                      styles.tipName,
+                      { color: f ? t.text.primary : t.text.secondary },
+                      f && { fontFamily: fonts.sans600 },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {s.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.tipVal,
+                      { color: t.text.primary },
+                      f && { fontFamily: fonts.mono500 },
+                    ]}
+                  >
+                    {formatByUnit(v, unit)}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         )}
       </Pressable>
@@ -348,7 +397,7 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
                   ];
                 }}
               >
-                <View style={[styles.legendKey, { backgroundColor: colorOf(s.rank) }]} />
+                <View style={[styles.legendKey, { backgroundColor: colorOf(s) }]} />
                 <Text style={[styles.legendText, { color: t.text.secondary }]}>
                   {glyph ? <Text style={{ color: t.text.dim }}>{glyph}</Text> : null}
                   {s.name}
@@ -378,7 +427,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
     paddingVertical: 6,
     paddingHorizontal: 8,
-    gap: 3,
+    gap: 2,
   },
   tipHead: { fontFamily: fonts.sans400, fontSize: 11, marginBottom: 2 },
   tipRow: { flexDirection: "row", alignItems: "center", gap: 6 },

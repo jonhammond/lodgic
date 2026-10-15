@@ -1,8 +1,10 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, PressableStateCallbackType, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   formatCompactCurrency,
   formatCurrency,
   formatNumber,
+  formatWeekEnding,
   formatPercent,
   humanize,
   isNumeric,
@@ -13,7 +15,13 @@ import { fonts, tabular } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { Card } from "./Card";
 
-type Props = { title: string; columns: string[]; rows: Record<string, unknown>[] };
+type Props = {
+  title: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  groupBy?: string;
+  seriesOrder?: Record<string, number>;
+};
 type Role = "label" | "heat" | "bar";
 
 const CURRENCY_RE = /revenue|adr|revpar|price|rate_usd/i;
@@ -22,8 +30,8 @@ const SUM_RE = /revenue|rooms_sold|rooms|count|total/i;
 
 const FLEX_BY_ROLE: Record<Role, number> = { label: 1.1, bar: 1.3, heat: 0.7 };
 
-export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
-  const { t } = useTheme();
+export function PropertyTable({ title, columns: inputColumns, rows, groupBy, seriesOrder }: Props) {
+  const { t, wide } = useTheme();
   const barColors = [t.table.revenueBar, t.table.adrBar, t.accent.violet];
 
   const labelCol = inputColumns.find((c) =>
@@ -31,7 +39,7 @@ export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
   );
   // Column order follows the mock (Property · Revenue · ADR · Occ.): label first,
   // bar columns next, heat (percent) columns last.
-  const rest = inputColumns.filter((c) => c !== labelCol);
+  const rest = inputColumns.filter((c) => c !== labelCol && c !== groupBy);
   const columns = [
     ...(labelCol ? [labelCol] : []),
     ...rest.filter((c) => !isPercentLikeKey(c)),
@@ -58,6 +66,43 @@ export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
     }
   });
 
+  const firstBar = columns.find((c) => roles[c] === "bar");
+
+  const groups = (() => {
+    if (!groupBy) return [];
+    const m = new Map<string, Record<string, unknown>[]>();
+    for (const r of rows) {
+      const k = String(r[groupBy]);
+      const g = m.get(k);
+      if (g) g.push(r);
+      else m.set(k, [r]);
+    }
+    return [...m.entries()]
+      .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+      .map(([key, rs]) => ({
+        key,
+        rows: firstBar
+          ? [...rs].sort((a, b) => toNumber(b[firstBar] ?? -Infinity) - toNumber(a[firstBar] ?? -Infinity))
+          : rs,
+      }));
+  })();
+
+  const [expandedState, setExpanded] = useState<{ rows: typeof rows; set: Set<string> } | null>(null);
+  // Reset to the newest group whenever the result set changes.
+  const expanded =
+    expandedState && expandedState.rows === rows
+      ? expandedState.set
+      : new Set(groups.length ? [groups[0].key] : []);
+  const toggle = (k: string) =>
+    setExpanded({
+      rows,
+      set: (() => {
+        const next = new Set(expanded);
+        if (!next.delete(k)) next.add(k);
+        return next;
+      })(),
+    });
+
   const flexOf = (i: number) => FLEX_BY_ROLE[roles[columns[i]]];
   const isLast = (i: number) => i === columns.length - 1;
   const alignOf = (i: number) => (isLast(i) ? ("right" as const) : ("left" as const));
@@ -78,6 +123,8 @@ export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
   };
 
   const cell = (c: string, i: number, r: Record<string, unknown>) => {
+    const rampColor =
+      groupBy && labelCol && seriesOrder ? t.trend.ramp[seriesOrder[String(r[labelCol]).trim()]] : undefined;
     const raw = r[c];
     const style = [styles.cell, { flex: flexOf(i) }];
     if (roles[c] === "label" || !isNumeric(raw)) {
@@ -111,7 +158,7 @@ export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
           <View
             style={[
               styles.bar,
-              { width: `${pct}%`, backgroundColor: barColors[barIdx[c] % barColors.length] },
+              { width: `${pct}%`, backgroundColor: (barIdx[c] === 0 ? rampColor : undefined) ?? barColors[barIdx[c] % barColors.length] },
             ]}
           />
           <Text numberOfLines={1} style={[styles.text, styles.barText, { color: t.text.primary }]}>
@@ -120,6 +167,18 @@ export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
         </View>
       </View>
     );
+  };
+
+  const groupSummary = (rs: Record<string, unknown>[]): string => {
+    if (!firstBar) return "";
+    const vals = rs.filter((r) => isNumeric(r[firstBar]));
+    if (vals.length === 0) return "";
+    const avg = vals.reduce((a, r) => a + toNumber(r[firstBar]), 0) / vals.length;
+    const lead = vals[0];
+    const leadName = labelCol && lead[labelCol] != null ? String(lead[labelCol]).trim() : "";
+    // Narrow layouts (horizontal-scroll table) drop the leader so the header fits the 440px row.
+    const leader = wide && leadName ? ` \u00b7 \u25b2 ${leadName} ${money(firstBar, toNumber(lead[firstBar]))}` : "";
+    return `avg ${money(firstBar, avg)}${leader}`;
   };
 
   return (
@@ -140,11 +199,54 @@ export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
               </View>
             ))}
           </View>
-          {rows.map((r, ri) => (
-            <View key={ri} style={[styles.row, { borderBottomColor: t.border.row }]}>
-              {columns.map((c, i) => cell(c, i, r))}
-            </View>
-          ))}
+          {groupBy
+            ? groups.map((g) => {
+                const open = expanded.has(g.key);
+                return (
+                  <View key={g.key}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: open }}
+                      onPress={() => toggle(g.key)}
+                      style={(state: PressableStateCallbackType) => {
+                        const hovered = (state as PressableStateCallbackType & { hovered?: boolean })
+                          .hovered;
+                        return [
+                          styles.groupHead,
+                          wide ? styles.groupHeadWide : styles.groupHeadNarrow,
+                          {
+                            backgroundColor: t.bg.panel,
+                            borderBottomColor: hovered ? t.border.strongHover : t.border.strong,
+                          },
+                        ];
+                      }}
+                    >
+                      <Text style={[styles.text, { color: t.text.dim }]}>{open ? "\u25be" : "\u25b8"}</Text>
+                      <Text style={[styles.text, styles.bold, { color: t.text.primary }]}>
+                        {formatWeekEnding(g.key)}
+                      </Text>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.groupSummary, wide && styles.groupSummaryWide, { color: t.text.secondary }]}
+                      >
+                        {groupSummary(g.rows)}
+                      </Text>
+                    </Pressable>
+                    {open &&
+                      g.rows.map((r, ri) => (
+                        <View key={ri} style={[styles.row, { borderBottomColor: t.border.row }]}>
+                          {columns.map((c, i) => cell(c, i, r))}
+                        </View>
+                      ))}
+                  </View>
+                );
+              })
+            : rows.map((r, ri) => (
+                <View key={ri} style={[styles.row, { borderBottomColor: t.border.row }]}>
+                  {columns.map((c, i) => cell(c, i, r))}
+                </View>
+              ))}
+          {!groupBy && (
           <View style={styles.totalRow}>
             {columns.map((c, i) => (
               <View key={c} style={{ flex: flexOf(i) }}>
@@ -157,6 +259,7 @@ export function PropertyTable({ title, columns: inputColumns, rows }: Props) {
               </View>
             ))}
           </View>
+          )}
         </View>
       </ScrollView>
     </Card>
@@ -184,5 +287,17 @@ const styles = StyleSheet.create({
   barCell: { height: 22, position: "relative", justifyContent: "center" },
   bar: { position: "absolute", left: 0, top: 0, bottom: 0 },
   barText: { textAlign: "right", paddingRight: 6 },
+  groupHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+  },
+  groupHeadWide: { flexWrap: "nowrap" },
+  groupHeadNarrow: { flexWrap: "wrap" },
+  groupSummary: { fontFamily: fonts.mono400, fontSize: 11, ...tabular, flexShrink: 1 },
+  groupSummaryWide: { marginLeft: "auto" },
   totalRow: { flexDirection: "row", gap: 10, paddingTop: 10, paddingBottom: 6 },
 });

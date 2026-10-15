@@ -44,7 +44,7 @@ export type TrendSeries = {
   note: string;
   unit: MetricUnit;
   labels: string[];
-  series: { name: string; values: (number | null)[]; rank: "top" | "bottom" | "mid" }[];
+  series: { name: string; values: (number | null)[]; rank: "top" | "bottom" | "mid"; order: number }[];
   reference: { y: number; label: string } | null;
 };
 
@@ -52,7 +52,12 @@ export type MappedResult = {
   headline: string;
   facts: string[];
   charts: (MetricSeries | TrendSeries)[];
-  table: { columns: string[]; rows: Record<string, unknown>[] } | null;
+  table: {
+    columns: string[];
+    rows: Record<string, unknown>[];
+    groupBy?: string;
+    seriesOrder?: Record<string, number>;
+  } | null;
 };
 
 const COLORS: ColorKey[] = ["revenue", "adr", "revpar", "occupancy"];
@@ -191,9 +196,21 @@ function rankSeries(
     if (lo < 0 || m < means[lo]) lo = i;
   });
   const ranked = entries.length >= 2 && hi !== lo;
+  const idx = entries.map((_, i) => i);
+  idx.sort((a, b) => {
+    const na = Number.isNaN(means[a]);
+    const nb = Number.isNaN(means[b]);
+    if (na || nb) return na === nb ? a - b : na ? 1 : -1;
+    return means[b] - means[a] || a - b;
+  });
+  const order = new Array<number>(entries.length);
+  idx.forEach((orig, pos) => {
+    order[orig] = pos;
+  });
   return entries.map((e, i) => ({
     name: e.name,
     values: e.values,
+    order: order[i],
     rank: ranked && i === hi ? "top" : ranked && i === lo ? "bottom" : "mid",
   }));
 }
@@ -287,7 +304,16 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         reference: unit === "index" ? { y: 100, label: "Market fair share" } : null,
       };
     });
-    return { headline: title, facts: trendFacts(charts[0]), charts, table: tableOf() };
+    const seriesOrder: Record<string, number> = {};
+    charts[0].series.forEach((s) => {
+      seriesOrder[s.name] = s.order;
+    });
+    return {
+      headline: title,
+      facts: trendFacts(charts[0]),
+      charts,
+      table: { ...tableOf(), groupBy: dateKey, seriesOrder },
+    };
   }
 
   // Time series is decided by data shape, not the LLM's chart hint: a date-like x
