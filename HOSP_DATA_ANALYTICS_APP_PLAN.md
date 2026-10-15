@@ -5,7 +5,7 @@
 Portfolio demo app: users ask natural-language analytics questions about a synthetic hotel portfolio; an AI agent converts them to SQL, Supabase executes them read-only, and the UI renders KPI tiles, charts, and tables. Based on `HotelAnalyticsAppDemoPlan.md` and `README.md`, with corrections where the source doc is outdated or insecure.
 
 **Confirmed decisions:**
-- AI engine: **Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`, fallback `gemini-3.1-flash-lite`)** (free tier, Google AI Studio key)
+- AI engine: **Google Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`, fallback `gemini-3.5-flash-lite`)** (free tier, Google AI Studio key)
 - Access: **fully public**, no auth; rate limiting on the Edge Function
 - Charts: **victory (web package)** via platform-specific imports — not victory-native XL (Skia-based, poor static-web support)
 - Hosting: **Vercel** (static export), embedded in portfolio via `<iframe>`
@@ -65,7 +65,7 @@ All schema as versioned migrations in `supabase/migrations/`, applied locally fi
 `supabase/functions/text-to-sql/index.ts` (Deno):
 1. CORS headers (allow portfolio origin + localhost); handle OPTIONS.
 2. Rate limit: hash caller IP, check `ai_query_log` (e.g. 20 req/hour/IP) → 429 on breach.
-3. Prompt Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`, fallback `gemini-3.1-flash-lite`) (`generativelanguage.googleapis.com/v1beta/.../gemini-3.5-flash-lite:generateContent`) with schema context + system rules; request structured JSON `{sql, recommended_chart: "bar"|"line"|"kpi"|"table", report_title}` using Gemini's `responseMimeType: "application/json"` + response schema (more reliable than "no backticks" prompting).
+3. Prompt Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`, fallback `gemini-3.5-flash-lite`) (`generativelanguage.googleapis.com/v1beta/.../gemini-3.1-flash-lite:generateContent`) with schema context + system rules; request structured JSON `{sql, recommended_chart: "bar"|"line"|"kpi"|"table", report_title}` using Gemini's `responseMimeType: "application/json"` + response schema (more reliable than "no backticks" prompting).
 4. Validate the returned SQL (same SELECT/WITH + no-semicolon checks, defense in depth), execute via `run_hotel_analytics` RPC with the service-role client.
 5. Return `{sql, chart, title, rows}`; structured error responses (Gemini failure, SQL error, rate limit) so the UI can show friendly messages.
 6. Secrets: `GEMINI_API_KEY` via `supabase secrets set` (prod) / `functions/.env` (local). Never in code.

@@ -2,9 +2,9 @@
   {
     "question": "Portfolio ADR, last 30 days",
     "chart": "kpi",
-    "title": "Portfolio ADR - Last 30 Days",
+    "title": "Portfolio ADR (Last 30 Days)",
     "columns": [
-      "portfolio_adr"
+      "adr"
     ],
     "rowCount": 1,
     "error": null
@@ -12,10 +12,10 @@
   {
     "question": "RevPAR vs occupancy",
     "chart": "kpi",
-    "title": "Portfolio RevPAR and Occupancy (Last 30 Days)",
+    "title": "Portfolio RevPAR vs Occupancy",
     "columns": [
-      "occupancy_pct",
-      "revpar"
+      "avg_occupancy",
+      "avg_revpar"
     ],
     "rowCount": 1,
     "error": null
@@ -34,7 +34,7 @@
   {
     "question": "Revenue by property this month",
     "chart": "bar",
-    "title": "Revenue by Property This Month",
+    "title": "Total Revenue by Property (Month-to-Date)",
     "columns": [
       "name",
       "total_revenue"
@@ -45,7 +45,7 @@
   {
     "question": "Total revenue yesterday",
     "chart": "bar",
-    "title": "Total Revenue Yesterday by Property",
+    "title": "Total Revenue by Property Yesterday",
     "columns": [
       "name",
       "total_revenue"
@@ -79,7 +79,7 @@
   {
     "question": "RGI trend, last 60 days",
     "chart": "line",
-    "title": "Revenue Generation Index (RGI) Trend over the Last 60 Days",
+    "title": "RGI Trend (Last 60 Days)",
     "columns": [
       "name",
       "rgi",

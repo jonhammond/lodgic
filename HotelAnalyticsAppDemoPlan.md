@@ -9,7 +9,7 @@ An overview and step-by-step implementation plan for building and hosting an AI-
 ### Core Functionality
 
 1. **Hospitality Intelligence Queries:** Users enter natural language requests or click preset prompts (e.g., *"Show me RevPAR and Occupancy % across all properties for the past 30 days"*).
-2. **AI Text-to-SQL Parsing:** A Supabase Edge Function sends the hotel database schema and system rules to **Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`, fallback `gemini-3.1-flash-lite`)** (free tier via Google AI Studio). Gemini returns a clean SQL statement and a chart type recommendation.
+2. **AI Text-to-SQL Parsing:** A Supabase Edge Function sends the hotel database schema and system rules to **Google Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`, fallback `gemini-3.5-flash-lite`)** (free tier via Google AI Studio). Gemini returns a clean SQL statement and a chart type recommendation.
 3. **Restricted Query Execution:** Supabase runs the query through a read-only PostgreSQL RPC function (`SECURITY DEFINER`) to prevent schema mutation or injection attacks.
 4. **Automated Data Ingestion:** Supabase `pg_cron` automatically executes a nightly SQL routine to insert fresh daily metrics and booking logs into your database.
 5. **Interactive UI:** Built with **React Native Web**, rendering key KPI metric tiles, interactive trend line/bar charts (`victory-native`), and property comparison data tables.
@@ -25,7 +25,7 @@ An overview and step-by-step implementation plan for building and hosting an AI-
 | **Data Visualization** | **`victory-native`** | Cross-platform SVG charting library for React Native ecosystems. |
 | **Backend & DB** | **Supabase (PostgreSQL)** | Relational DB, native Edge Functions (Deno/TS), Row Level Security, and `pg_cron`. |
 | **Automated Data** | **Supabase `pg_cron`** | Scheduled SQL routines inside Postgres to continuously populate fresh daily metrics. |
-| **AI Engine** | **Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`, fallback `gemini-3.1-flash-lite`)** | Generous free tier via Google AI Studio with fast execution for SQL parsing. |
+| **AI Engine** | **Google Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`, fallback `gemini-3.5-flash-lite`)** | Generous free tier via Google AI Studio with fast execution for SQL parsing. |
 
 ---
 
@@ -144,7 +144,7 @@ serve(async (req) => {
   `;
 
   const geminiResponse = await fetch(
-    `[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$){GEMINI_API_KEY}`,
+    `[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=$){GEMINI_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
