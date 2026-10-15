@@ -57,3 +57,11 @@ Deno.test("additive portfolio totals return one row per property", () => {
     "missing breakdown rule",
   );
 });
+
+Deno.test("per-property trends return weekly long format", () => {
+  assert(SYSTEM_PROMPT.includes("week_ending"), "missing week_ending bucket");
+  assert(
+    SYSTEM_PROMPT.includes("one row per property per week"),
+    "missing long-format trend rule",
+  );
+});

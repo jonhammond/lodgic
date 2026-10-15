@@ -37,10 +37,21 @@ export type MetricSeries = {
   unit: MetricUnit;
 };
 
+export type TrendSeries = {
+  kind: "trend";
+  key: string;
+  title: string;
+  note: string;
+  unit: MetricUnit;
+  labels: string[];
+  series: { name: string; values: (number | null)[]; rank: "top" | "bottom" | "mid" }[];
+  reference: { y: number; label: string } | null;
+};
+
 export type MappedResult = {
   headline: string;
   facts: string[];
-  charts: MetricSeries[];
+  charts: (MetricSeries | TrendSeries)[];
   table: { columns: string[]; rows: Record<string, unknown>[] } | null;
 };
 
@@ -80,12 +91,16 @@ export function formatByUnit(v: number, unit: MetricUnit): string {
   return formatNumber(v);
 }
 
+const ACRONYMS = /^(rgi|mpi|ari|adr|revpar|nps|csat|gop|cpor|ota|gds)$/i;
 const titleCase = (k: string) =>
-  k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  k
+    .split("_")
+    .map((w) => (ACRONYMS.test(w) ? w.toUpperCase().replace("REVPAR", "RevPAR") : w.replace(/^\w/, (c) => c.toUpperCase())))
+    .join(" ");
 
 const lbl = (s: string) => s.trim();
 
-function timeFacts(c: MetricSeries): string[] {
+function timeFacts(c: Pick<MetricSeries, "values" | "labels" | "unit">): string[] {
   const v = c.values;
   if (v.length < 2) return [];
   const fmt = (n: number) => formatByUnit(n, c.unit);
@@ -123,6 +138,94 @@ function categoryFacts(c: MetricSeries, xKey: string): string[] {
   return out;
 }
 
+function trendFacts(c: TrendSeries): string[] {
+  const fmt = (n: number) => formatByUnit(n, c.unit);
+  const out: string[] = [];
+  const mean = (vs: (number | null)[]) => {
+    const nn = vs.filter((v): v is number => v !== null);
+    return nn.length ? nn.reduce((a, b) => a + b, 0) / nn.length : 0;
+  };
+  const top = c.series.find((s) => s.rank === "top");
+  const bottom = c.series.find((s) => s.rank === "bottom");
+  if (top && bottom) {
+    out.push(
+      `${top.name} averaged ${fmt(mean(top.values))} over ${c.labels.length} ${c.note.startsWith("weekly") ? "weeks" : "periods"}; ${bottom.name} lowest at ${fmt(mean(bottom.values))}.`,
+    );
+  }
+  if (c.reference) {
+    const ref = c.reference.y;
+    const latest = c.series
+      .map((s) => s.values[c.labels.length - 1])
+      .filter((v): v is number => v != null);
+    out.push(
+      `${latest.filter((v) => v > ref).length} of ${c.series.length} properties above market fair share in the latest week.`,
+    );
+  }
+  return out;
+}
+
+function singleTrendFacts(c: TrendSeries): string[] {
+  const pts = c.series[0].values
+    .map((v, i) => ({ v, label: c.labels[i] }))
+    .filter((p): p is { v: number; label: string } => p.v !== null);
+  const facts = timeFacts({
+    values: pts.map((p) => p.v),
+    labels: pts.map((p) => p.label),
+    unit: c.unit,
+  });
+  return facts;
+}
+
+function rankSeries(
+  entries: { name: string; values: (number | null)[] }[],
+): TrendSeries["series"] {
+  const means = entries.map((e) => {
+    const nn = e.values.filter((v): v is number => v !== null);
+    return nn.length ? nn.reduce((a, b) => a + b, 0) / nn.length : NaN;
+  });
+  let hi = -1;
+  let lo = -1;
+  means.forEach((m, i) => {
+    if (Number.isNaN(m)) return;
+    if (hi < 0 || m > means[hi]) hi = i;
+    if (lo < 0 || m < means[lo]) lo = i;
+  });
+  const ranked = entries.length >= 2 && hi !== lo;
+  return entries.map((e, i) => ({
+    name: e.name,
+    values: e.values,
+    rank: ranked && i === hi ? "top" : ranked && i === lo ? "bottom" : "mid",
+  }));
+}
+
+function detectLongFormat(
+  rows: Record<string, unknown>[],
+): { dateKey: string; nameKey: string; valueKeys: string[] } | null {
+  if (rows.length < 2) return null;
+  const cols = Object.keys(rows[0]);
+  const dateCols = cols.filter((k) => rows.every((r) => isDateLike(r[k])));
+  if (dateCols.length !== 1) return null;
+  const dateKey = dateCols[0];
+  const isNumCol = (k: string) =>
+    rows.every((r) => r[k] == null || (isNumeric(r[k]) && !isDateLike(r[k])));
+  const textCols = cols.filter(
+    (k) => k !== dateKey && !isNumCol(k) && rows.every((r) => typeof r[k] === "string"),
+  );
+  if (textCols.length !== 1) return null;
+  const nameKey = textCols[0];
+  if (new Set(rows.map((r) => String(r[nameKey]).trim())).size < 2) return null;
+  const valueKeys = cols.filter((k) => k !== dateKey && k !== nameKey && isNumCol(k));
+  if (valueKeys.length < 1) return null;
+  if (new Set(rows.map((r) => String(r[dateKey]))).size < 2) return null;
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const id = `${String(r[dateKey])}\u0000${String(r[nameKey]).trim()}`;
+    if (seen.has(id)) return null;
+    seen.add(id);
+  }
+  return { dateKey, nameKey, valueKeys };
+}
+
 function tableFacts(rows: Record<string, unknown>[]): string[] {
   return [`${rows.length} rows \u00d7 ${Object.keys(rows[0]).length} columns.`];
 }
@@ -152,6 +255,41 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
 
   const tableOf = () => ({ columns: Object.keys(rows[0]), rows });
 
+  const long = detectLongFormat(rows);
+  if (long) {
+    const { dateKey, nameKey, valueKeys } = long;
+    const dates = [...new Set(rows.map((r) => String(r[dateKey])))].sort();
+    const dateIdx = new Map(dates.map((d, i) => [d, i]));
+    const names = [...new Set(rows.map((r) => String(r[nameKey]).trim()))];
+    const monthlyLong = dates.every((d) => d.slice(8, 10) === "01");
+    const labels = dates.map((d) =>
+      monthlyLong ? monthLabel(d) : `${d.slice(5, 7)}/${d.slice(8, 10)}`,
+    );
+    const weekly =
+      dates.length >= 2 &&
+      dates.every((d, i) => i === 0 || Date.parse(d.slice(0, 10)) - Date.parse(dates[i - 1].slice(0, 10)) === 7 * 86400000);
+    const charts = valueKeys.map((key): TrendSeries => {
+      const unit = unitFor(key);
+      const byName = new Map(names.map((n) => [n, new Array<number | null>(dates.length).fill(null)]));
+      for (const r of rows) {
+        const v = r[key];
+        byName.get(String(r[nameKey]).trim())![dateIdx.get(String(r[dateKey]))!] =
+          v == null ? null : toNumber(v);
+      }
+      return {
+        kind: "trend",
+        key,
+        title: titleCase(key),
+        note: weekly ? `weekly \u00b7 ${unit}` : unit,
+        unit,
+        labels,
+        series: rankSeries(names.map((n) => ({ name: n, values: byName.get(n)! }))),
+        reference: unit === "index" ? { y: 100, label: "Market fair share" } : null,
+      };
+    });
+    return { headline: title, facts: trendFacts(charts[0]), charts, table: tableOf() };
+  }
+
   // Time series is decided by data shape, not the LLM's chart hint: a date-like x
   // column with 2+ rows renders one bar chart per metric (README "How results map").
   const { xKey, yKeys } = columnRoles(rows);
@@ -166,9 +304,23 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
     const curYm = now.toISOString().slice(0, 7);
     const partialLast = monthly && xs[xs.length - 1].slice(0, 7) === curYm;
     const dim = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
-    const charts = yKeys.map((key, i): MetricSeries => {
-      const values = rows.map((r) => (r[key] == null ? 0 : toNumber(r[key])));
+    const charts = yKeys.map((key, i): MetricSeries | TrendSeries => {
       const unit = unitFor(key);
+      if (unit === "index") {
+        return {
+          kind: "trend",
+          key,
+          title: titleCase(key),
+          note: unit,
+          unit,
+          labels,
+          series: rankSeries([
+            { name: titleCase(key), values: rows.map((r) => (r[key] == null ? null : toNumber(r[key]))) },
+          ]),
+          reference: { y: 100, label: "Market fair share" },
+        };
+      }
+      const values = rows.map((r) => (r[key] == null ? 0 : toNumber(r[key])));
       const projection =
         partialLast && /revenue/i.test(key)
           ? (values[values.length - 1] / Math.max(1, now.getUTCDate())) * dim
@@ -186,7 +338,16 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         unit,
       };
     });
-    return { headline: title, facts: timeFacts(charts[0]), charts, table: null };
+    const first = charts[0];
+    return {
+      headline: title,
+      facts:
+        first.kind === "trend"
+          ? singleTrendFacts(first)
+          : timeFacts(first),
+      charts,
+      table: null,
+    };
   }
 
   if (rows.length >= 2 && rows.length <= 20 && !dated && yKeys.length >= 1) {

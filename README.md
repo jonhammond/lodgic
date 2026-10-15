@@ -33,6 +33,15 @@ curl -s -X POST http://127.0.0.1:54321/functions/v1/text-to-sql \
 
 Deno is not installed on the host; run `deno check/test/lint/fmt` for the Edge Function via the `denoland/deno` Docker image.
 
+## How results map
+
+`frontend/lib/resultMapping.ts` picks the renderer from the data shape, not the LLM's chart hint:
+
+- **Long format** (one date column, one text column with 2+ distinct values, numeric column(s), unique date/name pairs) pivots into one multi-series **trend line** chart per numeric column. Field lines are gray, the best period average is green, the worst orange; index metrics (MPI/ARI/RGI) add a dashed y=100 "Market fair share" reference line. The table renders alongside as a twin.
+- **Single-series index trend** (dated rows with an MPI/ARI/RGI column) renders as a single trend line with the reference line.
+- **Other dated rows** render one bar chart per metric (ADR, revenue, occupancy, ...).
+- **Categorical rows** (2-20 rows, no date) render ranked/category bars; everything else falls back to the table.
+
 ## Status
 
 - ✅ Phase 0 — local Supabase environment

@@ -50,6 +50,7 @@ export type Palette = {
     KpiColors
   >;
   table: { revenueBar: string; adrBar: string; heat: [string, string, string] };
+  trend: { top: string; bottom: string; mid: string; reference: string };
 };
 
 const accents = {
@@ -120,6 +121,7 @@ export const dark: Palette = {
   delta: { up: "#7fe0b4", down: "#ff8fa8", error: "#ff8fa8" },
   kpi,
   table: tableColors,
+  trend: { top: "#1baf7a", bottom: "#e8632a", mid: "#5b6670", reference: "#9aa4ad" },
 };
 
 // Design extrapolation: the handoff specifies dark only; light inverts the neutrals and keeps accents.
@@ -166,6 +168,7 @@ export const light: Palette = {
     market: { line: "#7b57c8", glow: "#7b57c880", bar: "#7b57c8", barPartial: "#7b57c88c" },
   },
   table: tableColors,
+  trend: { top: "#0f8a5a", bottom: "#d9532a", mid: "#aab3bb", reference: "#7d8790" },
 };
 
 export const radius = { button: 5, ask: 6, logo: 7, input: 8, rail: 9, card: 12, pill: 999 } as const;

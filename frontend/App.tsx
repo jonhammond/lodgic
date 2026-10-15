@@ -15,6 +15,7 @@ import { Platform, ScrollView, View } from "react-native";
 import { AnswerCard } from "./components/AnswerCard";
 import { CategoryBarChart } from "./components/charts/CategoryBarChart";
 import { MetricBarChart } from "./components/charts/MetricBarChart";
+import { TrendLineChart } from "./components/charts/TrendLineChart";
 import { Footer } from "./components/Footer";
 import { Grid } from "./components/Grid";
 import { Header } from "./components/Header";
@@ -296,9 +297,11 @@ function AppInner() {
             onResetRateLimit={() => dispatch({ type: "RESET_RATE_LIMIT" })}
           />
           {mapped && mapped.charts.length > 0 ? (
-            <Grid minWidth={280}>
+            <Grid minWidth={mapped.charts.some((s) => s.kind === "trend") ? 480 : 280}>
               {mapped.charts.map((s) =>
-                s.kind === "category" ? (
+                s.kind === "trend" ? (
+                  <TrendLineChart key={s.key} series={s} />
+                ) : s.kind === "category" ? (
                   <CategoryBarChart key={s.key} series={s} />
                 ) : (
                   <MetricBarChart key={s.key} series={s} />
