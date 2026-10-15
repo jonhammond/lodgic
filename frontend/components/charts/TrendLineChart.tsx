@@ -239,22 +239,6 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
                 }}
               />
             )}
-            {reference && (
-              <VictoryScatter
-                name="refLabel"
-                data={[{ x: 1, y: reference.y, label: reference.label }]}
-                size={0}
-                labelComponent={
-                  <VictoryLabel
-                    textAnchor="start"
-                    dx={4}
-                    dy={-7}
-                    style={{ fontFamily: fonts.sans400, fontSize: 10, fill: t.text.subtle }}
-                  />
-                }
-                style={{ data: { fill: "transparent" } }}
-              />
-            )}
             {drawOrder.map((s) => (
               <VictoryLine
                 key={s.name}
@@ -296,6 +280,24 @@ export function TrendLineChart({ series }: { series: TrendSeries }) {
                   }}
                 />
               ))}
+            {reference && (
+              <VictoryScatter
+                name="refLabel"
+                data={[{ x: 1, y: reference.y, label: reference.label }]}
+                size={0}
+                labelComponent={
+                  <VictoryLabel
+                    textAnchor="start"
+                    dx={4}
+                    dy={-8}
+                    backgroundStyle={{ fill: t.bg.card, opacity: 0.92 }}
+                    backgroundPadding={{ left: 4, right: 4, top: 2, bottom: 2 }}
+                    style={{ fontFamily: fonts.sans400, fontSize: 10, fill: t.text.muted }}
+                  />
+                }
+                style={{ data: { fill: "transparent" } }}
+              />
+            )}
             {hoverIdx !== null && (
               <VictoryLine
                 name="cross"
@@ -444,6 +446,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.button,
   },
-  legendKey: { width: 14, height: 2 },
+  legendKey: { width: 16, height: 4, borderRadius: 2 },
   legendText: { fontFamily: fonts.sans400, fontSize: 11 },
 });
