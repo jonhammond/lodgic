@@ -39,7 +39,7 @@ Order matters: deploy target + DNS first, portfolio merge last.
 
 ## 5. Portfolio (`~/Code/jonhammond.github.io`)
 
-- [ ] Retake screenshot at the same crop as the current `assets/lodgic.png`, overwrite it
+- [x] Retake screenshot at the same crop as the current `assets/lodgic.png`, overwrite it
 - [ ] Commit the rename on `dev`
 - [ ] Merge `dev` → `master` only after §3–4 are green (deploys to production)
 - [ ] Verify live card: image loads, title `lodgic`, both buttons resolve
