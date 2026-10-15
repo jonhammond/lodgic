@@ -4,7 +4,7 @@
 
 - [x] Implement plan in @ZPLANS/CPORvsADR_PLAN.md
 - [x] Implement plan in @ZPLANS/NPS_CSAT_PLAN.md
-- [ ] Implement plan in @ZPLANS/RevPARvsOccPlan.md
+- [x] Implement plan in @ZPLANS/RevPARvsOccPlan.md
 
 ## ADR rate/volume charts (2026-10-15 leftovers)
 
