@@ -13,7 +13,7 @@ ANON_KEY="$(supabase status -o env 2>/dev/null | sed -n 's/^ANON_KEY=//p' | tr -
 [ -z "$ANON_KEY" ] && { echo "could not read ANON_KEY (is the local stack running?)" >&2; exit 1; }
 
 if [ "$RESET" -eq 1 ]; then
-  # Local stack only: clears the per-IP rate-limit log so a run fits in the 20/hr cap.
+  # Local stack only: clears the per-IP rate-limit log so a run fits in the 60/hr cap.
   DB_URL="$(supabase status -o env 2>/dev/null | sed -n 's/^DB_URL=//p' | tr -d '"')"
   case "$DB_URL" in *127.0.0.1:54322*) ;; *) echo "refusing reset: DB_URL is not the local stack" >&2; exit 1 ;; esac
   docker run --rm --network host postgres:16-alpine psql "$DB_URL" -qc "truncate ai_query_log" \
@@ -34,7 +34,7 @@ for i in $(seq 0 $((N - 1))); do
       columns:((.rows // [])[0] // {} | keys), rowCount:((.rows // []) | length),
       error:(.error // null)}' 2>/dev/null)" || ENTRY="$(jq -nc --arg q "$Q" '{question:$q,error:"invalid response"}')"
   if [ "$(printf '%s' "$ENTRY" | jq -r '.error.code // empty')" = "rate_limited" ]; then
-    echo "aborted: per-IP rate limit hit at question $((i + 1)); wait for the hour window (20 queries/hr)" >&2
+    echo "aborted: per-IP rate limit hit at question $((i + 1)); wait for the hour window (60 queries/hr)" >&2
     exit 2
   fi
   RESULT="$(printf '%s' "$RESULT" | jq -c --argjson e "$ENTRY" '. + [$e]')"

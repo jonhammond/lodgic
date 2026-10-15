@@ -19,11 +19,10 @@ import {
   SUMMARY_SYSTEM_PROMPT,
 } from "./summary_prompt.ts";
 
-// Temporarily disabled; re-enable per TODO.md.
-const HOURLY_RATE_LIMIT_ENABLED = false;
-const RATE_LIMIT_PER_HOUR = 20;
-// Each request makes up to 2 Gemini calls plus a fallback retry; 6/min keeps Flash-Lite under the 15 RPM free-tier cap.
-const GLOBAL_LIMIT_PER_MINUTE = 6;
+const HOURLY_RATE_LIMIT_ENABLED = true;
+const RATE_LIMIT_PER_HOUR = 60;
+// Gemini Tier 1 quotas are ample; this cap bounds spend and DB load. Cache hits are exempt.
+const GLOBAL_LIMIT_PER_MINUTE = 30;
 const MAX_PROMPT_CHARS = 500;
 const GEMINI_TIMEOUT_MS = 20_000;
 const RPC_TIMEOUT_MS = 10_000;
@@ -370,6 +369,27 @@ async function handle(
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // Cache lookup (validated SQL from an earlier identical question)
+  const scoped = scopePrompt(prompt, propertyIds);
+  const key = await cacheKey(SYSTEM_PROMPT, scoped);
+  const bypass = req.headers.get(CACHE_BYPASS_HEADER) === "1";
+  const ttlHours = parseTtlHours(Deno.env.get("SQL_CACHE_TTL_HOURS"));
+  let cached: CacheRow | null = null;
+  if (!bypass) {
+    const { data, error } = await supabase
+      .from("ai_sql_cache")
+      .select("sql, chart, title, caveat, rows_hash, summary, hits, created_at")
+      .eq("cache_key", key)
+      .maybeSingle();
+    if (error) console.warn("ai_sql_cache lookup failed", error.code);
+    else if (
+      data && isFresh(data.created_at, ttlHours) &&
+      CHARTS.includes(data.chart) && validateSql(data.sql).ok
+    ) {
+      cached = data as CacheRow;
+    }
+  }
+
   // Rate limit
   const ipHash = await hashIp(clientIp(req), salt);
   if (HOURLY_RATE_LIMIT_ENABLED) {
@@ -393,19 +413,21 @@ async function handle(
       );
     }
   }
-  const { data: n, error: globalErr } = await supabase.rpc(
-    "count_queries_last_minute",
-  );
-  if (globalErr) {
-    console.error("count_queries_last_minute failed", globalErr.code);
-    throw new ApiError(
-      500,
-      "rate_limit_check_failed",
-      "Could not verify rate limit",
+  if (!cached) {
+    const { data: n, error: globalErr } = await supabase.rpc(
+      "count_queries_last_minute",
     );
-  }
-  if (typeof n === "number" && n >= GLOBAL_LIMIT_PER_MINUTE) {
-    throw new ApiError(429, "busy", "Demo is busy, try again in a minute");
+    if (globalErr) {
+      console.error("count_queries_last_minute failed", globalErr.code);
+      throw new ApiError(
+        500,
+        "rate_limit_check_failed",
+        "Could not verify rate limit",
+      );
+    }
+    if (typeof n === "number" && n >= GLOBAL_LIMIT_PER_MINUTE) {
+      throw new ApiError(429, "busy", "Demo is busy, try again in a minute");
+    }
   }
   const { error: logErr } = await supabase.from("ai_query_log").insert({
     ip_hash: ipHash,
@@ -417,27 +439,6 @@ async function handle(
       "rate_limit_check_failed",
       "Could not record request",
     );
-  }
-
-  // Cache lookup (validated SQL from an earlier identical question)
-  const scoped = scopePrompt(prompt, propertyIds);
-  const key = await cacheKey(SYSTEM_PROMPT, scoped);
-  const bypass = req.headers.get(CACHE_BYPASS_HEADER) === "1";
-  const ttlHours = parseTtlHours(Deno.env.get("SQL_CACHE_TTL_HOURS"));
-  let cached: CacheRow | null = null;
-  if (!bypass) {
-    const { data, error } = await supabase
-      .from("ai_sql_cache")
-      .select("sql, chart, title, caveat, rows_hash, summary, hits, created_at")
-      .eq("cache_key", key)
-      .maybeSingle();
-    if (error) console.warn("ai_sql_cache lookup failed", error.code);
-    else if (
-      data && isFresh(data.created_at, ttlHours) &&
-      CHARTS.includes(data.chart) && validateSql(data.sql).ok
-    ) {
-      cached = data as CacheRow;
-    }
   }
 
   // LLM (skipped on cache hit)
