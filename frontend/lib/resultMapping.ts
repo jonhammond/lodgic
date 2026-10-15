@@ -66,10 +66,21 @@ export type GroupedSeries = {
   series: { key: string; title: string; values: number[]; color: ColorKey }[];
 };
 
+/** A 1-5 satisfaction score (CSAT, shown as % of 5) with an NPS line over one category axis. */
+export type ComboSeries = {
+  kind: "combo";
+  key: string;
+  title: string;
+  labels: string[];
+  /** `values` are percent of the 5-point scale (raw * 20); `raw` keeps the 1-5 score. */
+  bar: { key: string; label: string; values: number[]; raw: number[]; color: ColorKey };
+  line: { key: string; label: string; values: number[]; color: ColorKey };
+};
+
 export type MappedResult = {
   headline: string;
   facts: string[];
-  charts: (MetricSeries | TrendSeries | GroupedSeries)[];
+  charts: (MetricSeries | TrendSeries | GroupedSeries | ComboSeries)[];
   pair: RateVolumePair | null;
   table: {
     columns: string[];
@@ -268,6 +279,20 @@ function findPair(valueKeys: string[]): { rateKey: string; volumeKey: string } |
   return null;
 }
 
+/** A 1-5 score column with its NPS companion on one category axis: one bar+line combo chart. */
+const CATEGORY_COMBOS: { bar: RegExp; line: RegExp; scale: number }[] = [
+  { bar: /csat/i, line: /(^|_)nps($|_)/i, scale: 20 },
+];
+
+function findCombo(charts: MetricSeries[]): { bar: MetricSeries; line: MetricSeries; scale: number } | null {
+  for (const c of CATEGORY_COMBOS) {
+    const bar = charts.find((m) => c.bar.test(m.key));
+    const line = charts.find((m) => c.line.test(m.key));
+    if (bar && line && bar !== line) return { bar, line, scale: c.scale };
+  }
+  return null;
+}
+
 function detectLongFormat(
   rows: Record<string, unknown>[],
   minNames = 2,
@@ -462,6 +487,28 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
         unit,
       };
     });
+    const combo = findCombo(charts);
+    if (combo) {
+      const names = xKey === "segment" ? labels.map(humanize) : labels;
+      const bar = { ...combo.bar, labels: names };
+      const line = { ...combo.line, labels: names };
+      const series: ComboSeries = {
+        kind: "combo",
+        key: `${bar.key}+${line.key}`,
+        title: `${bar.title} and ${line.title}`,
+        labels: names,
+        bar: { key: bar.key, label: bar.title, values: bar.values.map((v) => v * combo.scale), raw: bar.values, color: "guest" },
+        line: { key: line.key, label: line.title, values: line.values, color: "market" },
+      };
+      const rest = charts.filter((c) => c !== combo.bar && c !== combo.line);
+      return {
+        headline: title,
+        facts: [...categoryFacts(bar, xKey).slice(0, 2), categoryFacts(line, xKey)[0]],
+        charts: [series, ...rest],
+        pair: null,
+        table: tableOf(),
+      };
+    }
     const grouped = groupSameUnit(charts, title);
     if (grouped) {
       return {

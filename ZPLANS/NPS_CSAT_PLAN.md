@@ -4,6 +4,8 @@
 
 The preset chip "NPS and CSAT by segment" (`frontend/App.tsx:134-143` SUGGESTIONS) returns 5 rows `{segment, csat, nps}` (baseline `.claude/skills/prompt-regress/baseline.json:95-103`, chart `bar`). `mapResult` (`frontend/lib/resultMapping.ts:413-440`) treats this as a generic category result and renders two separate `CategoryBarChart`s (CSAT 1-5, NPS) side by side. The user wants one combo chart per the screenshot: CSAT as **% bars** on the left axis (ticks `80% (4.0)`, i.e. csat / 5 * 100 with the 5-point equivalent), NPS score as a **line on the right axis**, one x position per segment.
 
+Revised 2026-10-15 at implementation: CSAT bars use `kpi.guest.bar` and the NPS line `kpi.market.line` (no `trend.guest` token exists; `trend.volume` fails 3:1 in light mode); helpers live in `components/charts/`, not `lib/`; no frontend README exists.
+
 Decisions (confirmed): keep the 5-segment SQL (frontend-only, no `schema_prompt.ts` / baseline change); CSAT scaled as percent of 5.
 
 Data facts: `daily_metrics.csat numeric(3,2)` 0..5 (generator 3.6-4.8), `nps numeric(5,1)` -100..100 (generator 20-75). `segment` values: luxury, upper_upscale, upscale, upper_midscale, midscale.
