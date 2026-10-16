@@ -128,7 +128,8 @@ export const dark: Palette = {
     linkHover: "#c2d3ff",
   },
   delta: { up: "#7fe0b4", down: "#ff8fa8", error: "#ff8fa8" },
-  tier: { above: accents.violet, below: "#6b7d90", critical: "#ff8fa8" },
+  // Same hues as the scatter quadrants: green = above target, amber = below, red = critical.
+  tier: { above: "#34c98a", below: "#e0a526", critical: "#ff8fa8" },
   quadrant: { strong: "#34c98a", weak: "#ff8fa8", pricey: "#e0a526", busy: "#62b4f0" },
   kpi: {
     ...kpi,
@@ -186,7 +187,7 @@ export const light: Palette = {
     linkHover: "#3d70d1",
   },
   delta: { up: "#0f8a5a", down: "#c4204f", error: "#c4204f" },
-  tier: { above: "#7b57c8", below: "#7f8c98", critical: "#c4204f" },
+  tier: { above: "#0f8a5a", below: "#b07f12", critical: "#c4204f" },
   quadrant: { strong: "#0f8a5a", weak: "#c4204f", pricey: "#b07f12", busy: "#1f6fb8" },
   kpi: {
     ...kpi,

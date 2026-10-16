@@ -56,8 +56,8 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
   const narrow = width > 0 && width < NARROW_W;
   const basePad = narrow ? { ...PAD, ...NARROW_PAD } : PAD;
   const plotW = Math.max(0, width - basePad.left - basePad.right);
-  // Not the occupancy KPI pink: it is near-identical to the critical tier in both themes.
-  const lineColor = t.kpi.adr.line;
+  // Blue keeps the occupancy line distinct from the green / amber / red bar tiers in both themes.
+  const lineColor = t.quadrant.busy;
 
   const revValues = [target, ...rows.map((r) => r.revpar)];
   const { scale: bs, intervals } = INTERVAL_OPTIONS.map((k) => ({ scale: axisScale(revValues, k), intervals: k }))
