@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import type { RateVolumePair } from "../../lib/resultMapping";
 import { fonts, space } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
+import { ensureContrast } from "../../lib/color";
 import { trendColor } from "./format";
 import { RateVolumeChart } from "./RateVolumeChart";
 import { TrendLineChart } from "./TrendLineChart";
@@ -12,7 +13,7 @@ import { TrendLineChart } from "./TrendLineChart";
  * property. A single-property result needs no pin: both charts show at once.
  */
 export function RateVolumePanel({ pair }: { pair: RateVolumePair }) {
-  const { t } = useTheme();
+  const { t, scheme } = useTheme();
   const [selected, setSelected] = useState<string | null>(null);
   const { rate, volume } = pair;
   const single = rate.series.length === 1;
@@ -31,7 +32,7 @@ export function RateVolumePanel({ pair }: { pair: RateVolumePair }) {
             label: rate.title,
             values: rateSeries.values,
             unit: rate.unit,
-            color: trendColor(t, rateSeries, !single),
+            color: ensureContrast(trendColor(t, rateSeries, !single), t.bg.card, scheme),
           }}
           volume={{ label: volume.title, values: volumeSeries.values }}
         />

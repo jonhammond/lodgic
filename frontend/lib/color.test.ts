@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { dark, light } from "../theme/tokens.ts";
-import { barRamp, contrast, denseRankDesc, hexToRgb, mix, relativeLuminance, rgbToHex } from "./color.ts";
+import { barRamp, contrast, denseRankDesc, ensureContrast, hexToRgb, mix, relativeLuminance, rgbToHex } from "./color.ts";
 
 test("hex round-trip and mix endpoints", () => {
   assert.equal(rgbToHex(hexToRgb("#305eb7")), "#305eb7");
@@ -49,4 +49,15 @@ test("small n", () => {
   assert.equal(two[0], mix("#305eb7", "#000000", 0.2));
   assert.equal(two[1], mix("#305eb7", "#ffffff", 0.5));
   assert.deepEqual(barRamp("#305eb7", "#ffffff", "light", 0), []);
+});
+
+test("ensureContrast lifts every trend ramp colour to 3:1 on the card and leaves safe colours alone", () => {
+  for (const [scheme, t] of [["light", light], ["dark", dark]] as const) {
+    for (const hue of t.trend.ramp) {
+      const safe = ensureContrast(hue, t.bg.card, scheme);
+      assert.ok(contrast(safe, t.bg.card) >= 3, `${scheme} ${hue} -> ${safe} = ${contrast(safe, t.bg.card)}`);
+      if (contrast(hue, t.bg.card) >= 3) assert.equal(safe, hue);
+    }
+  }
+  assert.equal(ensureContrast("#000000", "#ffffff", "light"), "#000000");
 });

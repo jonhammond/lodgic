@@ -12,6 +12,7 @@ import {
   isNumeric,
   isPercentLikeKey,
   toNumber,
+  trendColor,
 } from "./charts/format";
 import { fonts, tabular } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
@@ -144,7 +145,9 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
 
   const cell = (c: string, i: number, r: Record<string, unknown>) => {
     const rampColor =
-      groupBy && labelCol && seriesOrder ? t.trend.ramp[seriesOrder[String(r[labelCol]).trim()]] : undefined;
+      groupBy && labelCol && seriesOrder
+        ? trendColor(t, { order: seriesOrder[String(r[labelCol]).trim()] }, Object.keys(seriesOrder).length > 1)
+        : undefined;
     const raw = r[c];
     const style = [styles.cell, { flex: flexOf(i) }];
     if (roles[c] === "label" || !isNumeric(raw)) {

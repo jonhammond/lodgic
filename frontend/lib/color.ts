@@ -71,3 +71,16 @@ export function barRamp(hue: string, surface: string, scheme: Scheme, n: number)
   const faint = faintEnd(hue, surface, fade);
   return Array.from({ length: n }, (_, i) => mix(deep, faint, i / (n - 1)));
 }
+
+// Thin strokes (2.5px lines) need 3:1 against the card. Ramp hues designed for fills may sit below that, so
+// mix toward black (light) or white (dark) just until the stroke clears `min`. Unchanged when already safe.
+export function ensureContrast(hex: string, surface: string, scheme: Scheme, min = 3): string {
+  const toward = scheme === "dark" ? "#ffffff" : "#000000";
+  let t = 0;
+  let out = hex;
+  while (contrast(out, surface) < min && t < 1) {
+    t = Math.min(1, t + FADE_STEP);
+    out = mix(hex, toward, t);
+  }
+  return out;
+}
