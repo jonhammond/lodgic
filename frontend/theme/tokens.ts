@@ -131,6 +131,9 @@ export const dark: Palette = {
   kpi: {
     ...kpi,
     revenue: { line: accents.blueFocus, glow: "#4c7dd9bf", bar: accents.blueFocus, barPartial: "#4c7dd98c" },
+    // accents.pink is ~2.7:1 on the dark card; lifted to the ramp pink (~5.8:1) for bars, lines and the barRamp hue.
+    occupancy: { line: "#f58ab8", glow: "#d6286ab3", bar: "#f58ab8", barPartial: "#f58ab88c" },
+    guest: { line: "#f58ab8", glow: "#d6286ab3", bar: "#f58ab8", barPartial: "#f58ab88c" },
   },
   table: { ...tableColors, revenueBar: accents.blueFocus },
   trend: {
@@ -186,6 +189,10 @@ export const light: Palette = {
     ...kpi,
     revpar: { line: "#7b57c8", glow: "#7b57c880", bar: "#7b57c8", barPartial: "#7b57c88c" },
     market: { line: "#7b57c8", glow: "#7b57c880", bar: "#7b57c8", barPartial: "#7b57c88c" },
+    // accents.green (~2.1:1) and accents.amber (~2.2:1) fail 3:1 on the white card; deeper hues (~3.8:1 / ~3.6:1).
+    adr: { line: "#16956a", glow: "#2acc8a99", bar: "#16956a", barPartial: "#16956a8c" },
+    distribution: { line: "#16956a", glow: "#2acc8a99", bar: "#16956a", barPartial: "#16956a8c" },
+    cost: { line: "#b07f12", glow: "#e0a526a6", bar: "#b07f12", barPartial: "#b07f128c" },
   },
   table: tableColors,
   trend: {
