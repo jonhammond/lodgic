@@ -6,11 +6,11 @@ Live demo: https://lodgic.jonhammond.org
 
 ## Stack
 
-- **DB:** Supabase Postgres — `properties` (10 hotels across luxury–midscale segments) + `daily_metrics` (revenue, distribution, departmental cost, comp-set index and guest-experience columns) + `portfolio_daily` view, nightly segment-aware `pg_cron` data generator, hardened read-only RPC (`run_hotel_analytics`) behind a privilege-restricted role
-- **API:** Supabase Edge Function `text-to-sql` (Deno) — CORS allow-list, per-IP rate limiting (20/hr) plus a global 6 req/min cap, Gemini structured output, defense-in-depth SQL validation, one retry on HTTP 429 against a fallback model
+- **DB:** Supabase Postgres — `properties` (10 hotels across luxury–midscale segments) + `daily_metrics` (revenue, distribution, departmental cost, comp-set index and guest-experience columns) + `portfolio_daily` view, nightly segment-aware `pg_cron` data generator, hardened read-only RPC (`run_hotel_analytics`) behind a privilege-restricted role, `ai_query_log` (rate limiting) and `ai_sql_cache` (validated SQL + summary cache, service_role only)
+- **API:** Supabase Edge Function `text-to-sql` (Deno) — CORS allow-list, per-IP rate limiting (60/hr) plus a global 30 req/min cap (cache hits exempt), Gemini structured output, defense-in-depth SQL validation, one retry on HTTP 429 against a fallback model, a second non-fatal Gemini pass that summarises the result rows, and a SQL cache keyed by hash(system prompt, normalized scoped question) with TTL `SQL_CACHE_TTL_HOURS` (default 168; header `x-cache-bypass: 1` forces fresh generation)
 - **API request:** `{prompt, property_ids?}` — optional UUID list (≤50) scopes every generated query to the selected properties
-- **API response:** `{sql, chart, title, rows}` plus `caveat` and `duration_ms`
-- **Frontend:** Expo / React Native Web dashboard (dark/light theme toggle, property picker, KPI sections, answer-first layout (headline + AI findings summary with deterministic fallback) over bar/line/table, ranked/category bar charts, SQL accordion, CSV export) + victory charts, static export on Vercel
+- **API response:** `{sql, chart, title, rows, summary, period_label, period_source, cached, duration_ms}` plus `caveat`; questions naming no period default to the last 30 days (`period_source` = `default`)
+- **Frontend:** Expo / React Native Web dashboard (dark/light theme toggle, property picker, KPI sections, answer-first layout (headline + AI findings summary with deterministic fallback) over bar/line/table, ranked/category bar charts, SQL accordion, CSV export) + victory charts, static export on Vercel. Two preset questions bypass Gemini and run client-side engines over `daily_metrics`: "RevPAR vs occupancy" (`lib/revparEngine.ts`, Daily / 30 days / Annualised, demand-shift slider, twin-panel chart + leaderboard) and "NPS and CSAT by segment" (`lib/npsCsatEngine.ts`, guest trend + score combo chart)
 
 ## Local development
 
@@ -23,7 +23,7 @@ supabase functions serve text-to-sql --env-file supabase/functions/.env
 cd frontend && npm install && npx expo start --web   # http://localhost:8081
 ```
 
-`supabase/functions/.env` (gitignored) needs `GEMINI_API_KEY` and `IP_HASH_SALT`; see `supabase/functions/.env.example`. Optional: `ALLOWED_ORIGINS` (comma-separated CORS origins beyond localhost defaults), `GEMINI_MODEL` (default `gemini-3.1-flash-lite`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`; empty disables the 429 retry).
+`supabase/functions/.env` (gitignored) needs `GEMINI_API_KEY` and `IP_HASH_SALT`; see `supabase/functions/.env.example`. Optional: `ALLOWED_ORIGINS` (comma-separated CORS origins beyond localhost defaults), `GEMINI_MODEL` (default `gemini-3.1-flash-lite`), `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`; empty disables the 429 retry), `SQL_CACHE_TTL_HOURS` (default 168).
 
 ```bash
 curl -s -X POST http://127.0.0.1:54321/functions/v1/text-to-sql \
@@ -41,7 +41,7 @@ Deno is not installed on the host; run `deno check/test/lint/fmt` for the Edge F
 - **Rate + volume pair** (long format whose numeric columns include ADR and rooms_sold, e.g. "ADR by property, last 30 days"; a single property also qualifies) renders the ADR trend with selectable lines and, for the pinned or only property, a combo chart: rooms-sold bars on a right-hand axis under the ADR line.
 - **Single-series index trend** (dated rows with an MPI/ARI/RGI column) renders as a single trend line with the reference line.
 - **Other dated rows** render one bar chart per metric (ADR, revenue, occupancy, ...).
-- **Categorical rows** (2-20 rows, no date) render ranked/category bars; 2-3 metrics sharing a currency or percent unit (CPOR vs ADR) render as one grouped bar chart with a legend and no table; everything else falls back to the table.
+- **Categorical rows** (2-20 rows, no date) render ranked/category bars (single-hue ranked ramp, deepest at the top); 2-3 metrics sharing a currency or percent unit (CPOR vs ADR) render as one grouped bar chart with a legend and no table; CSAT + NPS by category renders a score combo chart (CSAT % bars left, NPS line right); everything else falls back to the table.
 
 ## Status
 
@@ -53,4 +53,6 @@ Deno is not installed on the host; run `deno check/test/lint/fmt` for the Edge F
 - ✅ Dark dashboard redesign
 - ✅ Portfolio expansion — 10 hotels, 14 operating metrics, RPC hardening
 - ✅ Property filter + theme toggle
+- ✅ SQL cache, result summaries, global rate cap
+- ✅ Client-side RevPAR/occupancy and NPS/CSAT engines
 - 🔄 Open items tracked in [TODO.md](TODO.md)
