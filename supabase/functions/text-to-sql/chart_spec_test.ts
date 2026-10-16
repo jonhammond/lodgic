@@ -1,4 +1,9 @@
-import { parseChartSpec, validateSpec } from "./chart_spec.ts";
+import {
+  EXPLICIT_FORM_TRIGGERS,
+  parseChartSpec,
+  requestsExplicitForm,
+  validateSpec,
+} from "./chart_spec.ts";
 import { RESPONSE_SCHEMA } from "./schema_prompt.ts";
 
 function assert(cond: boolean, msg: string) {
@@ -221,5 +226,26 @@ Deno.test("legacy kinds force spec null without a log", () => {
     assert(result.chart === chart, `${chart} unchanged`);
     assert(result.spec === null, `${chart} spec null`);
     assert(logs.length === 0, `${chart} no log`);
+  }
+});
+
+Deno.test("requestsExplicitForm fires on each trigger phrase, case-insensitively", () => {
+  for (const t of EXPLICIT_FORM_TRIGGERS) {
+    assert(requestsExplicitForm(`Show a ${t} view`), `missed: ${t}`);
+    assert(requestsExplicitForm(t.toUpperCase()), `case: ${t}`);
+  }
+});
+
+Deno.test("requestsExplicitForm is false for plain comparisons", () => {
+  for (
+    const q of [
+      "RevPAR vs occupancy",
+      "CPOR vs ADR by property",
+      "NPS and CSAT by segment",
+      "ADR vs occupancy by property",
+      "Occupied rooms by property",
+    ]
+  ) {
+    assert(!requestsExplicitForm(q), `false positive: ${q}`);
   }
 });

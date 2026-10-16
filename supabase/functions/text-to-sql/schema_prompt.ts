@@ -94,7 +94,6 @@ export const METRIC_DIRECTION = {
     "adr",
     "occupancy_pct",
     "revpar",
-    "direct_bookings",
     "gop",
     "mpi",
     "ari",
@@ -103,24 +102,14 @@ export const METRIC_DIRECTION = {
     "csat",
     "repeat_guest_pct",
   ],
-  lower: [
-    "ota_bookings",
-    "cancellations",
-    "rooms_cost",
-    "fnb_cost",
-    "admin_cost",
-    "marketing_cost",
-    "maintenance_cost",
-    "utilities_cost",
-    "total_cost",
-    "cpor",
-    "housekeeping_hours",
-  ],
+  lower: ["cpor"],
 } as const;
 
 export const DIRECTION_LINE = `Direction: higher is better: ${
   METRIC_DIRECTION.higher.join(", ")
-}; lower is better: ${METRIC_DIRECTION.lower.join(", ")}.`;
+}; lower is better: ${
+  METRIC_DIRECTION.lower.join(", ")
+}; judge costs and cancellations (lower is better) and direct vs OTA bookings (higher direct share is better) per occupied room or as a share, never as raw totals.`;
 
 export const SYSTEM_PROMPT =
   `You translate hospitality analytics questions into one read-only PostgreSQL query.
@@ -156,14 +145,14 @@ keys, inventory, available rooms -> total_rooms
 chain scale, tier -> segment
 comp set, compset -> market_occupancy_pct, market_adr, market_revpar
 MPI, penetration -> mpi; ARI, rate index -> ari; RGI, revpar index -> rgi
-direct share -> direct_bookings / bookings; OTA share -> ota_bookings / bookings; cancel rate -> cancellations / bookings
+direct share -> sum(direct_bookings)::numeric / nullif(sum(bookings), 0) * 100; OTA share -> sum(ota_bookings)::numeric / nullif(sum(bookings), 0) * 100; cancel rate -> sum(cancellations)::numeric / nullif(sum(bookings), 0) * 100
 lead time, booking window -> avg_booking_window_days
 A&G, overhead -> admin_cost; S&M, marketing spend -> marketing_cost; POM, R&M -> maintenance_cost; energy -> utilities_cost; F&B cost -> fnb_cost; rooms expense -> rooms_cost
 opex, total expenses -> total_cost
-profit, GOP -> gop; GOP margin, margin -> gop / total_revenue; GOPPAR -> gop / total_rooms
+profit, GOP -> gop; GOP margin, margin -> sum(gop) / nullif(sum(total_revenue), 0) * 100
 CPOR, unit cost -> cpor
 satisfaction, rating -> csat; promoter score -> nps; repeat guests, returning guests -> repeat_guest_pct
-rooms per hour, productivity -> rooms_cleaned / housekeeping_hours; labor hours -> housekeeping_hours
+rooms per hour, productivity -> sum(rooms_cleaned)::numeric / nullif(sum(housekeeping_hours), 0); labor hours -> housekeeping_hours
 
 ${DIRECTION_LINE}
 
@@ -196,8 +185,8 @@ Rules:
 - report_title: a short human-readable title.
 - caveat: optional single sentence a reader needs before trusting the result, e.g. a requested metric is not tracked so a proxy is used, or the period is partial (month-to-date). Leave empty when there is none.
 - period_label: the period the query actually covers, as a short phrase such as "Last 30 days", "Last 60 days", "Month to date", "Yesterday". period_source: "question" when the question named the period, "default" when the missing-period rule supplied it.
-- Explicit chart form - only when the question contains "scatter", "pie", "donut", "share of", "stacked", "combo", "bar and line", or "on a second axis": honour it with recommended_chart scatter, pie, stacked_bar or combo, shape the SQL for it, and fill chart_spec {x, y, y2, label} with the exact column aliases used in the SQL. When none of those words appear, never pick scatter, pie, stacked_bar or combo.
-- SQL shape per chart form: scatter = name, <x_metric>, <y_metric> one row per property (chart_spec x = x_metric alias, y = [y_metric alias], label = name); pie = <label>, <value> with at most 8 rows (x = label, y = [value]); stacked_bar = name, <part1>, <part2>, ... wide format, one column per part (x = name, y = all part aliases); combo = <x>, <bar_metric>, <line_metric> (x = <x>, y = [bar_metric], y2 = line_metric).
+- Explicit chart form - overrides the bar default above, only when the question contains "scatter", "pie", "donut", "share of", "stacked", "combo", "bar and line", or "second axis": scatter -> scatter; pie / donut / share of -> pie; stacked -> stacked_bar; combo / bar and line / on a second axis -> combo. Shape the SQL for it and fill chart_spec {x, y, y2, label} with the exact column aliases used in the SQL. When none of those words appear, never pick scatter, pie, stacked_bar or combo: "X vs Y" or "X and Y by property" is a comparison, not a scatter - keep the existing bar/kpi behaviour.
+- SQL shape per chart form (only when one of the forms above was requested): scatter = name, <x_metric>, <y_metric> one row per property (chart_spec x = x_metric alias, y = [y_metric alias], label = name); pie = <label>, <value> with at most 8 rows (x = label, y = [value]); stacked_bar = name, <part1>, <part2>, ... wide format, one column per part (x = name, y = all part aliases); combo = <x>, <bar_metric>, <line_metric> (x = <x>, y = [bar_metric], y2 = line_metric).
 - chart_spec is null for bar, line, kpi and table; all other recommended_chart behaviour is unchanged.`;
 
 export const RESPONSE_SCHEMA = {

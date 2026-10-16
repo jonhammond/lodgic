@@ -55,7 +55,7 @@ Integer columns (`rooms_sold`, `bookings`, channel counts, `cancellations`, `roo
 | `cancellations` | Bookings cancelled; always <= `bookings` | rate = `sum(cancellations)::numeric / nullif(sum(bookings), 0) * 100` | count / % | lower | Cancels, cancellation rate, cancel %, attrition, drop-off |
 | `avg_booking_window_days` | Mean days between booking and arrival | `sum(avg_booking_window_days * bookings) / nullif(sum(bookings), 0)` | days | context (longer = more forward visibility) | Lead time, booking lead, booking window, advance purchase, days out, how far ahead |
 
-Channel mix = the four channel shares (they sum to 100%). Channel shares are additive composition: pie or stacked bar. Net of cancellations: net bookings = `bookings - cancellations`.
+Channel mix = the four channel shares (they sum to 100%). Channel shares are additive composition: pie or stacked bar when requested. Net of cancellations: net bookings = `bookings - cancellations`.
 
 ## daily_metrics: cost and profit (USALI departments)
 
@@ -81,7 +81,7 @@ Derived (no stored column):
 | GOPPAR | `sum(gop) / nullif(sum(total_rooms), 0)` | USD | higher | Gross operating profit per available room, profit per available room |
 | Department cost ratio | `sum(<x>_cost) / nullif(sum(total_revenue), 0) * 100` | % | lower | Cost % of revenue, expense ratio |
 | Flow-through | `(gop_current - gop_prior) / nullif(revenue_current - revenue_prior, 0) * 100` | % | higher | Flow-through, drop-through, incremental margin; needs two periods (CTE or conditional aggregation) |
-| Cost mix | `sum(<x>_cost) / nullif(sum(total_cost), 0) * 100` | % | n/a | Cost breakdown, where the money goes; composition (pie / stacked bar) |
+| Cost mix | `sum(<x>_cost) / nullif(sum(total_cost), 0) * 100` | % | n/a | Cost breakdown, where the money goes; composition (pie / stacked bar when requested) |
 
 ## daily_metrics: competitive benchmarks (STR-style comp set)
 

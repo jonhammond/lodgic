@@ -4,7 +4,12 @@
 //   period_source (question | default); questions naming no period default to the last 30 days.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { validateSql } from "./sql_guard.ts";
-import { parseChartSpec, validateSpec } from "./chart_spec.ts";
+import {
+  isSpecChart,
+  parseChartSpec,
+  requestsExplicitForm,
+  validateSpec,
+} from "./chart_spec.ts";
 import {
   type Chart,
   CHARTS,
@@ -463,6 +468,11 @@ async function handle(
     };
   } else {
     gen = await callGemini(scoped, geminiKey, geminiModel, geminiFallbackModel);
+  }
+  if (isSpecChart(gen.recommended_chart) && !requestsExplicitForm(prompt)) {
+    console.log(JSON.stringify({ spec_dropped: "no explicit chart request" }));
+    gen.recommended_chart = "bar";
+    gen.chart_spec = null;
   }
   const check = validateSql(gen.sql);
   if (!check.ok) {

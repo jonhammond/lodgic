@@ -8,6 +8,7 @@ import {
   PERIOD_SOURCES,
   SYSTEM_PROMPT,
 } from "./schema_prompt.ts";
+import { EXPLICIT_FORM_TRIGGERS } from "./chart_spec.ts";
 import { SUMMARY_SYSTEM_PROMPT } from "./summary_prompt.ts";
 
 function assert(cond: boolean, msg: string) {
@@ -195,6 +196,32 @@ Deno.test("every vocabulary term maps to a METRIC_COLUMNS column or a formula ov
   }
 });
 
+Deno.test("vocabulary ratio entries use the canonical numeric-cast, nullif form", () => {
+  const intCols = [
+    "rooms_sold",
+    "total_rooms",
+    "bookings",
+    "direct_bookings",
+    "ota_bookings",
+    "gds_bookings",
+    "group_bookings",
+    "cancellations",
+    "rooms_cleaned",
+  ];
+  for (const { terms, target } of vocabularyEntries()) {
+    if (!target.includes("/")) continue;
+    assert(target.includes("nullif("), `no nullif for: ${terms.join(", ")}`);
+    const numerator = target.split("/")[0];
+    const ids = numerator.match(/[a-z][a-z0-9]*(?:_[a-z0-9]+)*/g) ?? [];
+    if (ids.some((i) => intCols.includes(i))) {
+      assert(
+        target.includes("::numeric"),
+        `integer numerator without ::numeric for: ${terms.join(", ")}`,
+      );
+    }
+  }
+});
+
 Deno.test("vocabulary block stays compact", () => {
   const m = SYSTEM_PROMPT.match(/\nVocabulary:[^\n]*\n([\s\S]*?)\n\n/);
   const lines = (m as RegExpMatchArray)[1].split("\n").length;
@@ -244,11 +271,21 @@ Deno.test("chart-form rules are appended after every earlier Rules bullet and ex
   assert(shape === explicit + 1, "shape rule must follow explicit rule");
   assert(nullSpec === shape + 1, "null-spec rule must follow shape rule");
   assert(nullSpec === bullets.length - 1, "chart-form rules must be last");
+  assert(
+    bullets[explicit].includes("comparison, not a scatter"),
+    "missing negative example",
+  );
   assert(!SYSTEM_PROMPT.includes("No-fit"), "inference rule must stay removed");
   assert(
     bullets[explicit].includes("never pick scatter, pie, stacked_bar or combo"),
     "missing never-pick statement",
   );
+  for (const phrase of EXPLICIT_FORM_TRIGGERS) {
+    assert(
+      bullets[explicit].toLowerCase().includes(phrase),
+      `trigger "${phrase}" missing from the explicit-form rule`,
+    );
+  }
   for (const kind of ["scatter", "pie", "stacked_bar", "combo"]) {
     assert(bullets[shape].includes(kind), `missing ${kind}`);
   }

@@ -11,7 +11,28 @@ export const SCATTER_MIN_ROWS = 3;
 
 type Row = Record<string, unknown>;
 
-function isSpecChart(chart: Chart): chart is SpecChart {
+/** Lowercase phrases that explicitly request a scatter, pie, stacked bar or combo form. */
+export const EXPLICIT_FORM_TRIGGERS: readonly string[] = [
+  "scatter",
+  "pie",
+  "donut",
+  "share of",
+  "stacked",
+  "combo",
+  "bar and line",
+  "second axis",
+];
+
+/**
+ * Case-insensitive match with a leading word boundary (plain substring would fire on
+ * "occupied" via "pie"); the new chart kinds are never inferred.
+ */
+export function requestsExplicitForm(question: string): boolean {
+  const q = question.toLowerCase();
+  return EXPLICIT_FORM_TRIGGERS.some((t) => new RegExp(`\\b${t}`).test(q));
+}
+
+export function isSpecChart(chart: Chart): chart is SpecChart {
   return (SPEC_CHARTS as readonly string[]).includes(chart);
 }
 
