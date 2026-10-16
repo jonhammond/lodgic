@@ -4,11 +4,14 @@
 //   period_source (question | default); questions naming no period default to the last 30 days.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { validateSql } from "./sql_guard.ts";
+import { parseChartSpec, validateSpec } from "./chart_spec.ts";
 import {
+  type Chart,
   CHARTS,
+  type ChartSpec,
   parsePeriod,
-  PERIOD_SOURCES,
   type PeriodSource,
+  RESPONSE_SCHEMA,
   SYSTEM_PROMPT,
 } from "./schema_prompt.ts";
 import { parsePropertyIds, scopePrompt } from "./request.ts";
@@ -52,25 +55,6 @@ const DEFAULT_ORIGINS = [
   "http://127.0.0.1:8080",
   "http://127.0.0.1:8081",
 ];
-
-const RESPONSE_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    sql: { type: "STRING" },
-    recommended_chart: { type: "STRING", enum: [...CHARTS] },
-    report_title: { type: "STRING" },
-    caveat: { type: "STRING" },
-    period_label: { type: "STRING" },
-    period_source: { type: "STRING", enum: [...PERIOD_SOURCES] },
-  },
-  required: [
-    "sql",
-    "recommended_chart",
-    "report_title",
-    "period_label",
-    "period_source",
-  ],
-};
 
 const SUMMARY_TIMEOUT_MS = 8_000;
 
@@ -186,7 +170,8 @@ async function readRequest(
 
 type GeminiOutput = {
   sql: string;
-  recommended_chart: (typeof CHARTS)[number];
+  recommended_chart: Chart;
+  chart_spec: ChartSpec | null;
   report_title: string;
   caveat?: string;
   period_label: string | null;
@@ -195,7 +180,8 @@ type GeminiOutput = {
 
 type CacheRow = {
   sql: string;
-  chart: GeminiOutput["recommended_chart"];
+  chart: Chart;
+  chart_spec: ChartSpec | null;
   title: string;
   caveat: string;
   period_label: string | null;
@@ -300,6 +286,7 @@ async function callGemini(
       throw new Error("shape");
     }
     out.caveat = typeof out.caveat === "string" ? out.caveat.trim() : "";
+    out.chart_spec = parseChartSpec(out.recommended_chart, out.chart_spec);
     Object.assign(out, parsePeriod(out));
     return out as GeminiOutput;
   } catch {
@@ -399,7 +386,7 @@ async function handle(
     const { data, error } = await supabase
       .from("ai_sql_cache")
       .select(
-        "sql, chart, title, caveat, period_label, period_source, rows_hash, summary, hits, created_at",
+        "sql, chart, chart_spec, title, caveat, period_label, period_source, rows_hash, summary, hits, created_at",
       )
       .eq("cache_key", key)
       .maybeSingle();
@@ -469,6 +456,7 @@ async function handle(
     gen = {
       sql: cached.sql,
       recommended_chart: cached.chart,
+      chart_spec: parseChartSpec(cached.chart, cached.chart_spec),
       report_title: cached.title,
       caveat: cached.caveat,
       ...parsePeriod(cached),
@@ -503,6 +491,11 @@ async function handle(
   }
 
   const resultRows = rows ?? [];
+  const { chart, spec: chartSpec } = validateSpec(
+    gen.recommended_chart,
+    gen.chart_spec,
+    resultRows,
+  );
   const rowsHash = await hashRows(resultRows);
   let summary: string | null;
   if (cached && cached.rows_hash === rowsHash && cached.summary) {
@@ -538,7 +531,8 @@ async function handle(
       cache_key: key,
       prompt: scoped,
       sql: check.sql,
-      chart: gen.recommended_chart,
+      chart,
+      chart_spec: chartSpec,
       title: gen.report_title,
       caveat: gen.caveat ?? "",
       period_label: gen.period_label,
@@ -557,7 +551,8 @@ async function handle(
   return json(
     {
       sql: check.sql,
-      chart: gen.recommended_chart,
+      chart,
+      chart_spec: chartSpec,
       title: gen.report_title,
       rows: resultRows,
       caveat: gen.caveat || null,

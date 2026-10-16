@@ -22,9 +22,18 @@ Deno.test("prompt retains SQL formatting rules", () => {
   assert(SYSTEM_PROMPT.includes("double quotes"), "missing double quotes rule");
 });
 
-Deno.test("CHARTS is bar, line, kpi, table", () => {
+Deno.test("CHARTS is the four legacy kinds plus scatter, pie, combo, stacked_bar", () => {
   assert(
-    JSON.stringify(CHARTS) === JSON.stringify(["bar", "line", "kpi", "table"]),
+    JSON.stringify(CHARTS) === JSON.stringify([
+      "bar",
+      "line",
+      "kpi",
+      "table",
+      "scatter",
+      "pie",
+      "combo",
+      "stacked_bar",
+    ]),
     `unexpected CHARTS: ${JSON.stringify(CHARTS)}`,
   );
 });

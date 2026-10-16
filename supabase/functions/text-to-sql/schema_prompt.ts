@@ -1,4 +1,25 @@
-export const CHARTS = ["bar", "line", "kpi", "table"] as const;
+export const CHARTS = [
+  "bar",
+  "line",
+  "kpi",
+  "table",
+  "scatter",
+  "pie",
+  "combo",
+  "stacked_bar",
+] as const;
+export type Chart = (typeof CHARTS)[number];
+
+/** Chart kinds that carry a declarative chart_spec; legacy kinds always get null. */
+export const SPEC_CHARTS = ["scatter", "pie", "combo", "stacked_bar"] as const;
+export type SpecChart = (typeof SPEC_CHARTS)[number];
+
+export type ChartSpec = {
+  x: string;
+  y: string[];
+  y2?: string | null;
+  label?: string | null;
+};
 
 export const PERIOD_SOURCES = ["question", "default"] as const;
 export type PeriodSource = (typeof PERIOD_SOURCES)[number];
@@ -118,3 +139,33 @@ Rules:
 - report_title: a short human-readable title.
 - caveat: optional single sentence a reader needs before trusting the result, e.g. a requested metric is not tracked so a proxy is used, or the period is partial (month-to-date). Leave empty when there is none.
 - period_label: the period the query actually covers, as a short phrase such as "Last 30 days", "Last 60 days", "Month to date", "Yesterday". period_source: "question" when the question named the period, "default" when the missing-period rule supplied it.`;
+
+export const RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    sql: { type: "STRING" },
+    recommended_chart: { type: "STRING", enum: [...CHARTS] },
+    chart_spec: {
+      type: "OBJECT",
+      nullable: true,
+      properties: {
+        x: { type: "STRING" },
+        y: { type: "ARRAY", items: { type: "STRING" } },
+        y2: { type: "STRING", nullable: true },
+        label: { type: "STRING", nullable: true },
+      },
+      required: ["x", "y"],
+    },
+    report_title: { type: "STRING" },
+    caveat: { type: "STRING" },
+    period_label: { type: "STRING" },
+    period_source: { type: "STRING", enum: [...PERIOD_SOURCES] },
+  },
+  required: [
+    "sql",
+    "recommended_chart",
+    "report_title",
+    "period_label",
+    "period_source",
+  ],
+};
