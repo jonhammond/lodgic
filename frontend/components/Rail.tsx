@@ -1,8 +1,10 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { Pressable, PressableStateCallbackType, StyleSheet, Text, View } from "react-native";
 import { fonts, radius, space } from "../theme/tokens";
 import { Logo } from "./Logo";
 import { useTheme } from "../theme/useTheme";
+
+const TOGGLE_VIOLET_LIGHT = "#5b3fa6";
 
 type Props = {
   selectedCount: number;
@@ -13,9 +15,8 @@ type Props = {
 
 export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }: Props) {
   const { t, wide } = useTheme();
-  // Dark: amber sun with a dark glyph (white on amber is ~1.9:1). Light: violet moon with a white glyph.
-  const toggleBg = scheme === "dark" ? t.accent.amber : t.accent.violet;
-  const toggleFg = scheme === "dark" ? t.bg.rail : t.text.onAccent;
+  // Dark: amber sun. Light: deep violet moon (darker than accent.violet so the white glyph reads on white).
+  const toggleBg = scheme === "dark" ? t.accent.amber : TOGGLE_VIOLET_LIGHT;
   return (
     <View
       style={[
@@ -64,7 +65,7 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
           ];
         }}
       >
-        <Feather name={scheme === "dark" ? "sun" : "moon"} size={16} color={toggleFg} />
+        <Ionicons name={scheme === "dark" ? "sunny" : "moon"} size={16} color={t.text.onAccent} />
       </Pressable>
     </View>
   );
