@@ -37,7 +37,8 @@ const X_CHAR_W = 5.6; // sans 10px average advance
 const PLOT_H = 220;
 const GAP = 8;
 const MAX_BAR_W = 28;
-const TICKS = [0, 25, 50, 75, 100];
+// Both axes share one grid; 4 or 5 intervals, whichever wastes less headroom above the tallest bar.
+const INTERVAL_OPTIONS = [4, 5];
 
 const TIER_TEXT: Record<PropertyCalc["tier"], string> = {
   above: "Above target",
@@ -55,9 +56,13 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
   const narrow = width > 0 && width < NARROW_W;
   const basePad = narrow ? { ...PAD, ...NARROW_PAD } : PAD;
   const plotW = Math.max(0, width - basePad.left - basePad.right);
-  const lineColor = t.kpi.occupancy.line;
+  // Not the occupancy KPI pink: it is near-identical to the critical tier in both themes.
+  const lineColor = t.kpi.adr.line;
 
-  const bs = axisScale([target, ...rows.map((r) => r.revpar)]);
+  const revValues = [target, ...rows.map((r) => r.revpar)];
+  const { scale: bs, intervals } = INTERVAL_OPTIONS.map((k) => ({ scale: axisScale(revValues, k), intervals: k }))
+    .reduce((best, cur) => (cur.scale.hi < best.scale.hi ? cur : best));
+  const ticks = Array.from({ length: intervals + 1 }, (_, i) => (i * 100) / intervals);
   const norm = (v: number) => ((v - bs.lo) / (bs.hi - bs.lo)) * 100;
   const denorm = (y: number) => bs.lo + (y / 100) * (bs.hi - bs.lo);
 
@@ -109,7 +114,7 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
           >
             <VictoryAxis
               dependentAxis
-              tickValues={TICKS}
+              tickValues={ticks}
               tickFormat={(v: number) => tickLabel(denorm(v), "currency")}
               style={{
                 axis: { stroke: "transparent" },
@@ -121,8 +126,8 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
             <VictoryAxis
               dependentAxis
               orientation="right"
-              tickValues={TICKS}
-              tickFormat={(v: number) => `${v}%`}
+              tickValues={ticks}
+              tickFormat={(v: number) => `${Math.round(v)}%`}
               style={{
                 axis: { stroke: "transparent" },
                 grid: { stroke: "none" },
