@@ -1,11 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, PressableStateCallbackType, StyleSheet, Text, View } from "react-native";
-import { fonts, radius, space } from "../theme/tokens";
+import { fonts, space } from "../theme/tokens";
+import { BuildingIcon } from "./icons";
 import { Logo } from "./Logo";
 import { useTheme } from "../theme/useTheme";
 
 const TOGGLE_VIOLET_LIGHT = "#5b3fa6";
 const BAR_H = 48;
+const BUTTON_LEN = 48;
+const LOGO_GAP = 16;
+const BUTTON_GAP = 2;
 
 type Props = {
   selectedCount: number;
@@ -18,6 +22,12 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
   const { t, wide } = useTheme();
   // Dark: amber sun. Light: deep violet moon (darker than accent.violet so the white glyph reads on white).
   const toggleBg = scheme === "dark" ? t.accent.amber : TOGGLE_VIOLET_LIGHT;
+  // Buttons span the rail: full width in the column, full height in the top bar.
+  const block = wide
+    ? { width: space.railW, height: BUTTON_LEN }
+    : { width: BUTTON_LEN, height: BAR_H - 1 };
+  const hoverable = (state: PressableStateCallbackType) =>
+    Boolean((state as PressableStateCallbackType & { hovered?: boolean }).hovered) || state.pressed;
   return (
     <View
       style={[
@@ -29,50 +39,31 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
         },
       ]}
     >
-      {wide ? (
-        <Logo width={space.railW} height={space.railW} />
-      ) : (
-        <View style={styles.barLogo}>
-          <Logo width={BAR_H} height={BAR_H} iconSize={24} />
-        </View>
-      )}
-      <View
-        style={
-          wide
-            ? { width: 28, height: 1, backgroundColor: t.bg.card }
-            : { width: 1, height: 28, backgroundColor: t.bg.card }
-        }
-      />
+      {wide ? <Logo width={space.railW} height={space.railW} /> : <Logo width={BAR_H - 1} height={BAR_H - 1} iconSize={24} />}
+      <View style={wide ? { height: LOGO_GAP } : { width: LOGO_GAP }} />
       <Pressable
         onPress={onOpenProperties}
         accessibilityRole="button"
         accessibilityLabel="Select properties"
-        style={(state: PressableStateCallbackType) => {
-          const hovered = (state as PressableStateCallbackType & { hovered?: boolean }).hovered;
-          return [
-            styles.square,
-            { backgroundColor: hovered || state.pressed ? t.accent.blueHover : t.accent.blue },
-          ];
-        }}
+        style={(state) => [
+          styles.block,
+          block,
+          { backgroundColor: hoverable(state) ? t.accent.blueHover : t.accent.blue },
+        ]}
       >
-        <Ionicons name="business" size={16} color={t.text.onAccent} />
+        <BuildingIcon size={22} color={t.text.onAccent} />
         <View style={[styles.badge, { backgroundColor: t.accent.pink }]}>
           <Text style={styles.badgeText}>{selectedCount}</Text>
         </View>
       </Pressable>
+      <View style={wide ? { height: BUTTON_GAP } : { width: BUTTON_GAP }} />
       <Pressable
         onPress={onToggleTheme}
         accessibilityRole="button"
         accessibilityLabel={scheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        style={(state: PressableStateCallbackType) => {
-          const hovered = (state as PressableStateCallbackType & { hovered?: boolean }).hovered;
-          return [
-            styles.square,
-            { backgroundColor: toggleBg, opacity: hovered || state.pressed ? 0.85 : 1 },
-          ];
-        }}
+        style={(state) => [styles.block, block, { backgroundColor: toggleBg, opacity: hoverable(state) ? 0.85 : 1 }]}
       >
-        <Ionicons name={scheme === "dark" ? "sunny" : "moon"} size={16} color={t.text.onAccent} />
+        <Ionicons name={scheme === "dark" ? "sunny" : "moon"} size={18} color={t.text.onAccent} />
       </Pressable>
     </View>
   );
@@ -82,29 +73,20 @@ const styles = StyleSheet.create({
   column: {
     width: space.railW,
     alignItems: "center",
-    paddingBottom: 18,
-    gap: 14,
   },
   bar: {
     height: BAR_H,
     flexDirection: "row",
     alignItems: "center",
-    paddingRight: 16,
-    gap: 14,
   },
-  // Bottom border is drawn by the bar; the logo tile fills the remaining height flush to the left edge.
-  barLogo: { height: BAR_H - 1, justifyContent: "center" },
-  square: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.rail,
+  block: {
     alignItems: "center",
     justifyContent: "center",
   },
   badge: {
     position: "absolute",
-    top: -6,
-    right: -6,
+    top: 4,
+    right: 4,
     minWidth: 16,
     height: 16,
     paddingHorizontal: 4,
@@ -117,6 +99,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sans600,
     fontSize: 10,
     lineHeight: 12,
-    textAlign: "center",
   },
 });

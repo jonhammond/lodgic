@@ -1,11 +1,11 @@
-import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { GrowthIcon } from "./icons";
 
 type Props = { width: number; height: number; iconSize?: number };
 
-/** Lodgic mark: analytics glyph on the brand gradient. Fills the box it is given; no rounding so it can sit flush to the rail edges. */
-export function Logo({ width, height, iconSize = 28 }: Props) {
+/** Lodgic mark: growth glyph on the brand gradient. Fills the box it is given; no rounding so it sits flush to the rail edges. */
+export function Logo({ width, height, iconSize = 30 }: Props) {
   return (
     <View style={{ width, height }} accessibilityLabel="Lodgic" accessibilityRole="image">
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
@@ -18,7 +18,7 @@ export function Logo({ width, height, iconSize = 28 }: Props) {
         <Rect width={width} height={height} fill="url(#logoGradient)" />
       </Svg>
       <View style={styles.center}>
-        <Ionicons name="analytics" size={iconSize} color="#ffffff" />
+        <GrowthIcon size={iconSize} color="#ffffff" />
       </View>
     </View>
   );
