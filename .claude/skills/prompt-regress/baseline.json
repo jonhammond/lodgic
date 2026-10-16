@@ -16,13 +16,14 @@
   },
   {
     "question": "RevPAR vs occupancy",
-    "chart": "kpi",
-    "title": "Portfolio RevPAR and Occupancy",
+    "chart": "bar",
+    "title": "RevPAR vs Occupancy by Property",
     "columns": [
-      "occupancy_pct",
-      "revpar"
+      "avg_occupancy",
+      "avg_revpar",
+      "name"
     ],
-    "rowCount": 1,
+    "rowCount": 10,
     "period_label": "Last 30 days",
     "period_source": "default",
     "error": null
@@ -43,7 +44,7 @@
   {
     "question": "Revenue by property this month",
     "chart": "bar",
-    "title": "Revenue by Property - Month to Date",
+    "title": "Total Revenue by Property - Month to Date",
     "columns": [
       "name",
       "total_revenue"
@@ -96,7 +97,7 @@
   {
     "question": "RGI trend, last 60 days",
     "chart": "line",
-    "title": "RGI Trend by Property",
+    "title": "RGI Trend (Last 60 Days)",
     "columns": [
       "name",
       "rgi",
