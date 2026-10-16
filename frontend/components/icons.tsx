@@ -67,12 +67,14 @@ export function SunIcon({ size, color }: IconProps) {
   );
 }
 
-/** Moon: crescent from a full disc minus an offset disc (evenodd). 24-unit box, draw at 24 px. */
+/** Moon: crescent opening to the upper right with four sparkle stars in the gap. 24-unit box, draw at 24 px. */
 export function MoonIcon({ size, color }: IconProps) {
-  const d = "M12 2 A10 10 0 1 0 22 12 A7.5 7.5 0 0 1 12 2 Z";
+  const crescent = "M8.48 4.73 A9.0 9.0 0 1 0 18.93 16.66 A8.0 8.0 0 0 1 8.48 4.73 Z";
+  const stars = "M16 1.0 Q16 3.2 18.2 3.2 Q16 3.2 16 5.4 Q16 3.2 13.8 3.2 Q16 3.2 16 1.0 Z M20.3 5.0 Q20.3 8.2 23.5 8.2 Q20.3 8.2 20.3 11.4 Q20.3 8.2 17.1 8.2 Q20.3 8.2 20.3 5.0 Z M14 6.6 Q14 9 16.4 9 Q14 9 14 11.4 Q14 9 11.6 9 Q14 9 14 6.6 Z M18.3 11.7 Q18.3 13.6 20.2 13.6 Q18.3 13.6 18.3 15.5 Q18.3 13.6 16.4 13.6 Q18.3 13.6 18.3 11.7 Z";
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d={d} fill={color} />
+      <Path d={crescent} fill={color} />
+      <Path d={stars} fill={color} />
     </Svg>
   );
 }
