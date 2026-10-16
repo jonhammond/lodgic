@@ -1,4 +1,11 @@
-import { Pressable, PressableStateCallbackType, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  PressableStateCallbackType,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { fonts, radius, tabular } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { Card } from "./Card";
@@ -42,14 +49,22 @@ export function AnswerCard({
 }: Props) {
   const { t } = useTheme();
   const meta = [
-    period ? (periodSource === "default" ? `${period} (default)` : period) : null,
+    period
+      ? periodSource === "default"
+        ? `${period} (default)`
+        : period
+      : null,
     rowCount != null ? `${rowCount} rows` : null,
     durationMs != null ? `${durationMs} ms` : null,
   ]
     .filter(Boolean)
     .join(" · ");
 
-  const paragraph = findings?.trim() ? findings.trim() : facts.length > 0 ? facts.join(" ") : null;
+  const paragraph = findings?.trim()
+    ? findings.trim()
+    : facts.length > 0
+      ? facts.join(" ")
+      : null;
   const summaryText = headline ? (
     <Text style={[styles.headline, { color: t.text.primary }]}>{headline}</Text>
   ) : null;
@@ -69,7 +84,9 @@ export function AnswerCard({
   } else if (status === "error") {
     body = (
       <>
-        <Text style={[styles.body, { color: t.delta.error }]}>{errorMessage}</Text>
+        <Text style={[styles.body, { color: t.delta.error }]}>
+          {errorMessage}
+        </Text>
         {summaryText}
       </>
     );
@@ -77,10 +94,21 @@ export function AnswerCard({
     body = (
       <>
         {summaryText}
-        {caveatText("Rate limit reached — 20 queries per hour. Try again later.")}
-        <Pressable onPress={onResetRateLimit} accessibilityRole="link" style={styles.link}>
+        {caveatText(
+          "Rate limit reached — 20 queries per hour. Try again later.",
+        )}
+        <Pressable
+          onPress={onResetRateLimit}
+          accessibilityRole="link"
+          style={styles.link}
+        >
           {(s) => (
-            <Text style={[styles.body, { color: hovered(s) ? t.accent.linkHover : t.accent.link }]}>
+            <Text
+              style={[
+                styles.body,
+                { color: hovered(s) ? t.accent.linkHover : t.accent.link },
+              ]}
+            >
               Try again
             </Text>
           )}
@@ -91,25 +119,38 @@ export function AnswerCard({
     body = (
       <>
         {summaryText}
-        {paragraph ? <Text style={[styles.findings, { color: t.text.secondary }]}>{paragraph}</Text> : null}
+        {paragraph ? (
+          <Text style={[styles.findings, { color: t.text.secondary }]}>
+            {paragraph}
+          </Text>
+        ) : null}
         {caveat ? caveatText(caveat) : null}
       </>
     );
   } else {
-    body = <Text style={[styles.body, { color: t.text.muted }]}>Ask a question or pick a suggestion.</Text>;
+    body = (
+      <Text style={[styles.body, { color: t.text.muted }]}>
+        Ask a question or pick a suggestion.
+      </Text>
+    );
   }
 
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: t.text.primary }]}>Answer</Text>
-        {meta ? <Text style={[styles.meta, { color: t.text.subtle }]}>{meta}</Text> : null}
+        {meta ? (
+          <Text style={[styles.meta, { color: t.text.subtle }]}>{meta}</Text>
+        ) : null}
       </View>
       {body}
       {sqlOpen && sql ? (
         <ScrollView
           horizontal
-          style={[styles.codeBox, { backgroundColor: t.bg.code, borderRadius: radius.input }]}
+          style={[
+            styles.codeBox,
+            { backgroundColor: t.bg.code, borderRadius: radius.input },
+          ]}
           contentContainerStyle={styles.codeInner}
         >
           <Text selectable style={[styles.code, { color: t.text.secondary }]}>
@@ -118,9 +159,18 @@ export function AnswerCard({
         </ScrollView>
       ) : null}
       {sql ? (
-        <Pressable onPress={onToggleSql} accessibilityRole="button" style={styles.link}>
+        <Pressable
+          onPress={onToggleSql}
+          accessibilityRole="button"
+          style={styles.link}
+        >
           {(s) => (
-            <Text style={[styles.body, { color: hovered(s) ? t.accent.linkHover : t.accent.link }]}>
+            <Text
+              style={[
+                styles.body,
+                { color: hovered(s) ? t.accent.linkHover : t.accent.link },
+              ]}
+            >
               {sqlOpen ? "Hide generated SQL" : "View generated SQL →"}
             </Text>
           )}
@@ -132,9 +182,16 @@ export function AnswerCard({
 
 const styles = StyleSheet.create({
   card: { paddingVertical: 14, paddingHorizontal: 18, gap: 8 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  header: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    columnGap: 12,
+    rowGap: 2,
+  },
   title: { fontFamily: fonts.sans700, fontSize: 13 },
-  meta: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  meta: { fontFamily: fonts.mono400, fontSize: 11, flexShrink: 1, ...tabular },
   body: { fontFamily: fonts.sans400, fontSize: 13 },
   headline: { fontFamily: fonts.sans500, fontSize: 16, lineHeight: 22 },
   findings: { fontFamily: fonts.sans400, fontSize: 13, lineHeight: 19 },

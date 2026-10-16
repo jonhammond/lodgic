@@ -9,8 +9,8 @@ export const VALUE_CHAR_W = 6.2; // mono 10px advance
 export const WIDE = { chars: 26, left: 170 };
 export const NARROW = { chars: 18, left: 122 };
 
-/** Greedy word wrap to at most two lines; a lone over-long word is clipped with an ellipsis. */
-export function wrapLabel(s: string, chars: number): string {
+/** Greedy word wrap to at most `maxLines` lines; a lone over-long word is clipped with an ellipsis. */
+export function wrapLabel(s: string, chars: number, maxLines = 2): string {
   const words = s.trim().split(/\s+/);
   const lines: string[] = [];
   let cur = "";
@@ -23,7 +23,8 @@ export function wrapLabel(s: string, chars: number): string {
     }
   }
   lines.push(cur);
-  if (lines.length <= 2) return lines.join("\n");
-  const second = lines.slice(1).join(" ");
-  return `${lines[0]}\n${second.slice(0, chars - 1)}…`;
+  if (lines.length <= maxLines) return lines.join("\n");
+  const head = lines.slice(0, maxLines - 1);
+  const tail = lines.slice(maxLines - 1).join(" ");
+  return [...head, `${tail.slice(0, chars - 1)}…`].join("\n");
 }

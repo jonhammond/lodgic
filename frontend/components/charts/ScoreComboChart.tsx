@@ -1,5 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View, type PressableStateCallbackType } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type PressableStateCallbackType,
+} from "react-native";
 import {
   VictoryAxis,
   VictoryBar,
@@ -22,7 +28,11 @@ import { niceCeil } from "./scale";
 const PAD = { top: 10, bottom: 34, left: 66, right: 40 };
 const SELECTABLE_BOTTOM = 10;
 const NARROW_W = 360;
-const NARROW_PAD = { left: 68, right: 34 };
+// Narrow: x ticks rotate 35° on one line, so the bottom gutter grows to fit the slanted text.
+const NARROW_PAD = { left: 68, right: 34, bottom: 62 };
+const NARROW_TICK_ANGLE = -35;
+const NARROW_MAX_CHARS = 16;
+const NARROW_LABEL_LINES = 3;
 const DIM_OPACITY = 0.7; // non-selected bars; keeps >=3:1 against the dark card
 const PLOT_H = 200;
 const GAP = 8;
@@ -46,7 +56,13 @@ type Props = {
 };
 
 /** CSAT as percent-of-5 bars on the left axis with the NPS score as a line on the right. */
-export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, footer }: Props) {
+export function ScoreComboChart({
+  series,
+  selectedIndex = null,
+  onSelect,
+  note,
+  footer,
+}: Props) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const { labels, bar, line } = series;
@@ -80,11 +96,33 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
     score: line.values[i] ?? 0,
   }));
   const dots = line.values.map((v, i) => ({ x: i + 1, y: toY(v) }));
-  const barWidth = n > 0 ? Math.max(1, Math.min(MAX_BAR_W, (plotW - GAP * (n - 1)) / n)) : 1;
-  // Wrap each label to its slot: ~5.6px per sans-10 char, two lines max (wrapLabel).
+  const barWidth =
+    n > 0 ? Math.max(1, Math.min(MAX_BAR_W, (plotW - GAP * (n - 1)) / n)) : 1;
+  // Wrap each label to its slot: ~5.6px per sans-10 char, two lines max (wrapLabel). Narrow
+  // slots are too tight to wrap ("Upper Midsc…"), so the axis rotates single-line labels and
+  // the selectable label row wraps to three lines instead.
   const slotChars = n > 0 ? Math.floor(plotW / n / X_CHAR_W) : MAX_LABEL_CHARS;
-  const names = labels.map((l) => wrapLabel(l ?? "", Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars))));
-  const tickLabels = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
+  const names = narrow
+    ? labels.map((l) =>
+        wrapLabel(l ?? "", Math.max(6, slotChars), NARROW_LABEL_LINES),
+      )
+    : labels.map((l) =>
+        wrapLabel(l ?? "", Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars))),
+      );
+  const axisNames = narrow
+    ? labels.map((l) => {
+        const s = (l ?? "").trim();
+        return s.length > NARROW_MAX_CHARS
+          ? `${s.slice(0, NARROW_MAX_CHARS - 1)}…`
+          : s;
+      })
+    : names;
+  const tickLabels = {
+    fontFamily: fonts.mono400,
+    fontSize: 10,
+    fill: t.text.tick,
+    padding: 6,
+  };
 
   const tooltipText = ({ x, y, raw, score }: BarDatum): string[] => [
     labels[x - 1] ?? "",
@@ -94,8 +132,11 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
 
   return (
     <Card style={styles.card}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]} numberOfLines={1}>
+      <View style={[styles.header, narrow && styles.headerNarrow]}>
+        <Text
+          style={[styles.title, { color: t.text.primary }]}
+          numberOfLines={narrow ? 2 : 1}
+        >
           {series.title}
         </Text>
         <Text style={[styles.note, { color: t.text.subtle }]}>
@@ -111,7 +152,10 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
             domain={{ x: [0.5, n + 0.5], y: [0, 100] }}
             domainPadding={0}
             containerComponent={
-              <VictoryVoronoiContainer voronoiDimension="x" voronoiBlacklist={["line", "dots"]} />
+              <VictoryVoronoiContainer
+                voronoiDimension="x"
+                voronoiBlacklist={["line", "dots"]}
+              />
             }
           >
             <VictoryAxis
@@ -120,7 +164,11 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
               tickFormat={(v: number) => `${v}% (${(v / 20).toFixed(1)})`}
               style={{
                 axis: { stroke: "transparent" },
-                grid: { stroke: t.border.axis, strokeWidth: 1, strokeDasharray: "none" },
+                grid: {
+                  stroke: t.border.axis,
+                  strokeWidth: 1,
+                  strokeDasharray: "none",
+                },
                 ticks: { stroke: "transparent" },
                 tickLabels: { ...tickLabels, textAnchor: "end" },
               }}
@@ -164,21 +212,41 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
                   pointerLength={4}
                   cornerRadius={0}
                   flyoutPadding={{ top: 4, bottom: 4, left: 8, right: 8 }}
-                  flyoutStyle={{ fill: t.bg.panel, stroke: t.border.strong, strokeWidth: 1 }}
-                  style={{ fontFamily: fonts.mono400, fontSize: 10, fill: t.text.primary }}
+                  flyoutStyle={{
+                    fill: t.bg.panel,
+                    stroke: t.border.strong,
+                    strokeWidth: 1,
+                  }}
+                  style={{
+                    fontFamily: fonts.mono400,
+                    fontSize: 10,
+                    fill: t.text.primary,
+                  }}
                 />
               }
               style={{
                 data: selectable
                   ? {
-                      fill: ({ active, datum }: { active?: boolean; datum?: BarDatum }) =>
-                        active || selectedIndex === (datum?.x ?? 0) - 1 ? barColor.line : barColor.bar,
+                      fill: ({
+                        active,
+                        datum,
+                      }: {
+                        active?: boolean;
+                        datum?: BarDatum;
+                      }) =>
+                        active || selectedIndex === (datum?.x ?? 0) - 1
+                          ? barColor.line
+                          : barColor.bar,
                       fillOpacity: ({ datum }: { datum?: BarDatum }) =>
-                        selectedIndex != null && selectedIndex !== (datum?.x ?? 0) - 1 ? DIM_OPACITY : 1,
+                        selectedIndex != null &&
+                        selectedIndex !== (datum?.x ?? 0) - 1
+                          ? DIM_OPACITY
+                          : 1,
                       cursor: "pointer",
                     }
                   : {
-                      fill: ({ active }: { active?: boolean }) => (active ? barColor.line : barColor.bar),
+                      fill: ({ active }: { active?: boolean }) =>
+                        active ? barColor.line : barColor.bar,
                     },
               }}
             />
@@ -213,12 +281,26 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
               name="dots"
               data={dots}
               size={3.5}
-              style={{ data: { fill: lineColor, stroke: t.bg.card, strokeWidth: 1.5 } }}
+              style={{
+                data: { fill: lineColor, stroke: t.bg.card, strokeWidth: 1.5 },
+              }}
             />
             <VictoryAxis
               tickValues={labels.map((_, i) => i + 1)}
-              tickFormat={(i: number) => (selectable ? "" : (names[i - 1] ?? ""))}
-              tickLabelComponent={<VictoryLabel lineHeight={1.15} />}
+              tickFormat={(i: number) =>
+                selectable ? "" : (axisNames[i - 1] ?? "")
+              }
+              tickLabelComponent={
+                narrow && !selectable ? (
+                  <VictoryLabel
+                    angle={NARROW_TICK_ANGLE}
+                    textAnchor="end"
+                    verticalAnchor="middle"
+                  />
+                ) : (
+                  <VictoryLabel lineHeight={1.15} />
+                )
+              }
               style={{
                 axis: { stroke: t.border.axis, strokeWidth: 1 },
                 grid: { stroke: "none" },
@@ -290,11 +372,13 @@ function LabelCell({
       style={[styles.labelCell, narrow && styles.labelCellNarrow]}
     >
       {(state: PressableStateCallbackType) => {
-        const hovered = (state as PressableStateCallbackType & { hovered?: boolean }).hovered;
+        const hovered = (
+          state as PressableStateCallbackType & { hovered?: boolean }
+        ).hovered;
         return (
           <>
             <Text
-              numberOfLines={2}
+              numberOfLines={narrow ? NARROW_LABEL_LINES : 2}
               style={[
                 X_TICK_FONT,
                 styles.labelText,
@@ -304,7 +388,12 @@ function LabelCell({
             >
               {text}
             </Text>
-            <View style={[styles.labelUnderline, selected && { backgroundColor: underline }]} />
+            <View
+              style={[
+                styles.labelUnderline,
+                selected && { backgroundColor: underline },
+              ]}
+            />
           </>
         );
       }}
@@ -321,16 +410,39 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 14,
   },
+  headerNarrow: { flexDirection: "column", alignItems: "flex-start", gap: 2 },
   title: { fontFamily: fonts.sans700, fontSize: 13, flexShrink: 1 },
   note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
   labelRow: { flexDirection: "row" },
-  labelCell: { flex: 1, alignItems: "center", paddingTop: 6, paddingHorizontal: 2, cursor: "pointer" },
+  labelCell: {
+    flex: 1,
+    alignItems: "center",
+    paddingTop: 6,
+    paddingHorizontal: 2,
+    cursor: "pointer",
+  },
   labelCellNarrow: { paddingHorizontal: 0 },
   labelText: { textAlign: "center", lineHeight: 12 },
   labelHover: { textDecorationLine: "underline" },
-  labelUnderline: { height: 2, alignSelf: "stretch", marginTop: 4, backgroundColor: "transparent" },
-  legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 2, marginTop: 10 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
+  labelUnderline: {
+    height: 2,
+    alignSelf: "stretch",
+    marginTop: 4,
+    backgroundColor: "transparent",
+  },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 14,
+    rowGap: 2,
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 3,
+  },
   lineKey: { width: 16, height: 3, borderRadius: 2 },
   barKey: { width: 10, height: 10, borderRadius: 1 },
   legendText: { fontFamily: fonts.sans400, fontSize: 11 },

@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Pressable, PressableStateCallbackType, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  PressableStateCallbackType,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -32,18 +39,34 @@ const CURRENCY_RE = /revenue|adr|revpar|price|rate_usd/i;
 // Totals heuristic: additive metrics are summed, everything else (ADR, occupancy, ...) is averaged.
 const SUM_RE = /revenue|rooms_sold|rooms|count|total/i;
 // Grouped results list one row per property; the raw `name` key reads better as "Property".
-const LABEL_OVERRIDES: Record<string, string> = { name: "Property", property_name: "Property", property: "Property" };
+const LABEL_OVERRIDES: Record<string, string> = {
+  name: "Property",
+  property_name: "Property",
+  property: "Property",
+};
 
 const FLEX_BY_ROLE: Record<Role, number> = { label: 1.1, bar: 1.3, heat: 0.7 };
-const FLEX_BY_ROLE_NARROW: Record<Role, number> = { label: 1.5, bar: 1.2, heat: 0.7 };
-// Fixed value slots so the numbers form a column under the header and the bar starts at one x.
-// Narrow (phone / iframe) widths shrink the value slot and column gap so a label plus two bar columns
-// fit without horizontal scrolling; the bar track absorbs the rest.
-const VALUE_W = { wide: { currency: 84, count: 64 }, narrow: { currency: 62, count: 46 } } as const;
+// Narrow: the label gets the lion's share so property names stay on one line; bar columns stack
+// the value over a full-width track (see `cell`), so they need less room than wide.
+const FLEX_BY_ROLE_NARROW: Record<Role, number> = {
+  label: 2,
+  bar: 1,
+  heat: 0.7,
+};
+// Fixed value slots so the numbers form a column under the header and the bar starts at one x
+// (wide only; narrow stacks the value above the bar so the track spans the whole column).
+const VALUE_W = { currency: 84, count: 64 } as const;
 
-export function PropertyTable({ title, columns: inputColumns, rows, groupBy, seriesOrder }: Props) {
+export function PropertyTable({
+  title,
+  columns: inputColumns,
+  rows,
+  groupBy,
+  seriesOrder,
+}: Props) {
   const { t, wide, scheme } = useTheme();
-  const slotOf = (c: string) => VALUE_W[wide ? "wide" : "narrow"][CURRENCY_RE.test(c) ? "currency" : "count"];
+  const slotOf = (c: string) =>
+    VALUE_W[CURRENCY_RE.test(c) ? "currency" : "count"];
   const gap = wide ? COL_GAP : NARROW_GAP;
 
   const labelCol = inputColumns.find((c) =>
@@ -74,7 +97,10 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
       barIdx[c] = b++;
     } else if (roles[c] === "heat") {
       const s = nums(c).sort((x, y) => y - x);
-      heatCuts[c] = [s[Math.floor(s.length / 3)] ?? 0, s[Math.floor((2 * s.length) / 3)] ?? 0];
+      heatCuts[c] = [
+        s[Math.floor(s.length / 3)] ?? 0,
+        s[Math.floor((2 * s.length) / 3)] ?? 0,
+      ];
     }
   });
 
@@ -94,14 +120,21 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
       .map(([key, rs]) => ({
         key,
         rows: firstBar
-          ? [...rs].sort((a, b) => toNumber(b[firstBar] ?? -Infinity) - toNumber(a[firstBar] ?? -Infinity))
+          ? [...rs].sort(
+              (a, b) =>
+                toNumber(b[firstBar] ?? -Infinity) -
+                toNumber(a[firstBar] ?? -Infinity),
+            )
           : rs,
       }));
   })();
 
   // Daily buckets read as plain dates; only seven-day spacing gets the "Week ending" label.
   const weekly = isWeeklySpacing(groups.map((g) => g.key));
-  const [expandedState, setExpanded] = useState<{ rows: typeof rows; set: Set<string> } | null>(null);
+  const [expandedState, setExpanded] = useState<{
+    rows: typeof rows;
+    set: Set<string>;
+  } | null>(null);
   // Reset to the newest group whenever the result set changes.
   const expanded =
     expandedState && expandedState.rows === rows
@@ -117,14 +150,18 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
       })(),
     });
 
-  const flexOf = (i: number) => (wide ? FLEX_BY_ROLE : FLEX_BY_ROLE_NARROW)[roles[columns[i]]];
+  const flexOf = (i: number) =>
+    (wide ? FLEX_BY_ROLE : FLEX_BY_ROLE_NARROW)[roles[columns[i]]];
   const isLast = (i: number) => i === columns.length - 1;
   // Bar columns are value-then-bar, so their header sits over the value slot on the left;
   // only a trailing heat column right-aligns.
   const alignOf = (i: number) =>
-    isLast(i) && roles[columns[i]] === "heat" ? ("right" as const) : ("left" as const);
+    isLast(i) && roles[columns[i]] === "heat"
+      ? ("right" as const)
+      : ("left" as const);
   const headerOf = (c: string) =>
-    (groupBy && roles[c] === "label" && LABEL_OVERRIDES[c.toLowerCase()]) || humanize(c);
+    (groupBy && roles[c] === "label" && LABEL_OVERRIDES[c.toLowerCase()]) ||
+    humanize(c);
 
   const money = (c: string, v: number) =>
     !CURRENCY_RE.test(c)
@@ -138,7 +175,15 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
     const sum = vals.reduce((a, x) => a + x, 0);
     const summed = SUM_RE.test(c);
     const val = summed ? sum : sum / vals.length;
-    const text = roles[c] === "heat" ? formatPercent(val) : money(c, val);
+    // Narrow group headers have no room for cents: "avg $315" instead of "avg $314.52".
+    const rounded =
+      !wide && !summed && CURRENCY_RE.test(c) && Math.abs(val) < 1e6;
+    const text =
+      roles[c] === "heat"
+        ? formatPercent(val)
+        : rounded
+          ? formatCurrency(Math.round(val))
+          : money(c, val);
     return summed ? text : `avg ${text}`;
   };
   const totalFor = (c: string) => aggregate(c, nums(c));
@@ -152,7 +197,11 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
     const rampColor =
       groupBy && labelCol && seriesOrder
         ? ensureContrast(
-            trendColor(t, { order: seriesOrder[String(r[labelCol]).trim()] }, Object.keys(seriesOrder).length > 1),
+            trendColor(
+              t,
+              { order: seriesOrder[String(r[labelCol]).trim()] },
+              Object.keys(seriesOrder).length > 1,
+            ),
             t.bg.card,
             scheme,
           )
@@ -162,7 +211,12 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
     if (roles[c] === "label" || !isNumeric(raw)) {
       return (
         <View key={c} style={style}>
-          <Text style={[styles.text, { color: t.text.primary, textAlign: alignOf(i) }]}>
+          <Text
+            style={[
+              styles.text,
+              { color: t.text.primary, textAlign: alignOf(i) },
+            ]}
+          >
             {raw == null ? "" : String(raw)}
           </Text>
         </View>
@@ -171,12 +225,21 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
     const v = toNumber(raw);
     if (roles[c] === "heat") {
       const [hi, mid] = heatCuts[c];
-      const bg = v >= hi ? t.table.heat[0] : v >= mid ? t.table.heat[1] : t.table.heat[2];
+      const bg =
+        v >= hi
+          ? t.table.heat[0]
+          : v >= mid
+            ? t.table.heat[1]
+            : t.table.heat[2];
       return (
         <View key={c} style={style}>
           <Text
             numberOfLines={1}
-            style={[styles.text, styles.heat, { backgroundColor: bg, color: t.text.onAccent }]}
+            style={[
+              styles.text,
+              styles.heat,
+              { backgroundColor: bg, color: t.text.onAccent },
+            ]}
           >
             {formatPercent(v)}
           </Text>
@@ -188,22 +251,31 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
     // trend chart); every later bar column is the thin grey volume bar the combo chart uses.
     const lead = barIdx[c] === 0;
     const color = lead ? (rampColor ?? t.table.adrBar) : t.trend.volumeActive;
-    const size = lead ? styles.barTall : styles.barThin;
+    const size = wide
+      ? lead
+        ? styles.barTall
+        : styles.barThin
+      : lead
+        ? styles.barTallNarrow
+        : styles.barThinNarrow;
     return (
       <View key={c} style={style}>
-        <View style={styles.barCell}>
+        <View style={wide ? styles.barCell : styles.barCellNarrow}>
           <Text
             numberOfLines={1}
             style={[
               styles.text,
               styles.barValue,
-              { width: slotOf(c), color: t.text.primary },
+              wide ? { width: slotOf(c) } : styles.barValueNarrow,
+              { color: t.text.primary },
             ]}
           >
             {money(c, v)}
           </Text>
           <View style={[styles.barTrack, size]}>
-            <View style={[size, { width: `${pct}%`, backgroundColor: color }]} />
+            <View
+              style={[size, { width: `${pct}%`, backgroundColor: color }]}
+            />
           </View>
         </View>
       </View>
@@ -215,13 +287,19 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
   const suffixFor = (rs: Record<string, unknown>[], open: boolean): string => {
     if (!wide) return "";
     if (open) {
-      const noun = labelCol && LABEL_OVERRIDES[labelCol.toLowerCase()] ? "properties" : "rows";
+      const noun =
+        labelCol && LABEL_OVERRIDES[labelCol.toLowerCase()]
+          ? "properties"
+          : "rows";
       return `${rs.length} ${noun}`;
     }
     if (!firstBar || !labelCol) return "";
     const lead = rs.find((r) => isNumeric(r[firstBar]));
-    const name = lead && lead[labelCol] != null ? String(lead[labelCol]).trim() : "";
-    return lead && name ? `${name} led at ${money(firstBar, toNumber(lead[firstBar]))}` : "";
+    const name =
+      lead && lead[labelCol] != null ? String(lead[labelCol]).trim() : "";
+    return lead && name
+      ? `${name} led at ${money(firstBar, toNumber(lead[firstBar]))}`
+      : "";
   };
 
   return (
@@ -233,10 +311,20 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
         contentContainerStyle={styles.scrollContent}
       >
         <View style={[styles.inner, wide ? styles.innerWide : null]}>
-          <View style={[styles.headerRow, { gap, borderBottomColor: t.border.strong }]}>
+          <View
+            style={[
+              styles.headerRow,
+              { gap, borderBottomColor: t.border.strong },
+            ]}
+          >
             {columns.map((c, i) => (
               <View key={c} style={{ flex: flexOf(i) }}>
-                <Text style={[styles.headText, { color: t.text.secondary, textAlign: alignOf(i) }]}>
+                <Text
+                  style={[
+                    styles.headText,
+                    { color: t.text.secondary, textAlign: alignOf(i) },
+                  ]}
+                >
                   {headerOf(c)}
                 </Text>
               </View>
@@ -253,36 +341,66 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                       accessibilityState={{ expanded: open }}
                       onPress={() => toggle(g.key)}
                       style={(state: PressableStateCallbackType) => {
-                        const hovered = (state as PressableStateCallbackType & { hovered?: boolean })
-                          .hovered;
+                        const hovered = (
+                          state as PressableStateCallbackType & {
+                            hovered?: boolean;
+                          }
+                        ).hovered;
                         return [
                           styles.groupHead,
                           {
                             gap,
                             backgroundColor: t.bg.panel,
-                            borderBottomColor: hovered ? t.border.strongHover : t.border.strong,
+                            borderBottomColor: hovered
+                              ? t.border.strongHover
+                              : t.border.strong,
                           },
                         ];
                       }}
                     >
                       {columns.map((c, i) =>
                         i === 0 ? (
-                          <View key={c} style={[styles.cell, styles.groupLabel, { flex: flexOf(i) }]}>
-                            <Text style={[styles.text, { color: t.text.dim }]}>{open ? "▾" : "▸"}</Text>
-                            <Text style={[styles.text, styles.bold, styles.date, { color: t.text.primary }]}>
-                              {weekly ? formatWeekEnding(g.key) : formatLongDate(g.key)}
+                          <View
+                            key={c}
+                            style={[
+                              styles.cell,
+                              styles.groupLabel,
+                              { flex: flexOf(i) },
+                            ]}
+                          >
+                            <Text style={[styles.text, { color: t.text.dim }]}>
+                              {open ? "▾" : "▸"}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.text,
+                                styles.bold,
+                                styles.date,
+                                { color: t.text.primary },
+                              ]}
+                            >
+                              {weekly
+                                ? formatWeekEnding(g.key)
+                                : formatLongDate(g.key)}
                             </Text>
                             {suffix ? (
                               <Text
                                 numberOfLines={1}
-                                style={[styles.subtotal, styles.suffix, { color: t.text.secondary }]}
+                                style={[
+                                  styles.subtotal,
+                                  styles.suffix,
+                                  { color: t.text.secondary },
+                                ]}
                               >
                                 {suffix}
                               </Text>
                             ) : null}
                           </View>
                         ) : (
-                          <View key={c} style={[styles.cell, { flex: flexOf(i) }]}>
+                          <View
+                            key={c}
+                            style={[styles.cell, { flex: flexOf(i) }]}
+                          >
                             <Text
                               numberOfLines={1}
                               style={[
@@ -303,7 +421,13 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                     </Pressable>
                     {open &&
                       g.rows.map((r, ri) => (
-                        <View key={ri} style={[styles.row, { gap, borderBottomColor: t.border.row }]}>
+                        <View
+                          key={ri}
+                          style={[
+                            styles.row,
+                            { gap, borderBottomColor: t.border.row },
+                          ]}
+                        >
                           {columns.map((c, i) => cell(c, i, r))}
                         </View>
                       ))}
@@ -311,23 +435,30 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                 );
               })
             : rows.map((r, ri) => (
-                <View key={ri} style={[styles.row, { gap, borderBottomColor: t.border.row }]}>
+                <View
+                  key={ri}
+                  style={[styles.row, { gap, borderBottomColor: t.border.row }]}
+                >
                   {columns.map((c, i) => cell(c, i, r))}
                 </View>
               ))}
           {!groupBy && (
-          <View style={[styles.totalRow, { gap }]}>
-            {columns.map((c, i) => (
-              <View key={c} style={{ flex: flexOf(i) }}>
-                <Text
-                  numberOfLines={1}
-                  style={[styles.text, styles.bold, { color: t.text.primary, textAlign: alignOf(i) }]}
-                >
-                  {roles[c] === "label" ? "Total" : totalFor(c)}
-                </Text>
-              </View>
-            ))}
-          </View>
+            <View style={[styles.totalRow, { gap }]}>
+              {columns.map((c, i) => (
+                <View key={c} style={{ flex: flexOf(i) }}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.text,
+                      styles.bold,
+                      { color: t.text.primary, textAlign: alignOf(i) },
+                    ]}
+                  >
+                    {roles[c] === "label" ? "Total" : totalFor(c)}
+                  </Text>
+                </View>
+              ))}
+            </View>
           )}
         </View>
       </ScrollView>
@@ -344,11 +475,16 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1 },
   inner: { flex: 1 },
   innerWide: { minWidth: 520 },
-  headerRow: { flexDirection: "row", gap: COL_GAP, paddingVertical: 8, borderBottomWidth: 1 },
+  headerRow: {
+    flexDirection: "row",
+    gap: COL_GAP,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
   headText: { fontFamily: fonts.sans600, fontSize: 12 },
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     gap: COL_GAP,
     paddingVertical: 9,
     borderBottomWidth: 1,
@@ -356,14 +492,25 @@ const styles = StyleSheet.create({
   cell: { justifyContent: "center" },
   text: { fontFamily: fonts.sans400, fontSize: 13, ...tabular },
   bold: { fontFamily: fonts.sans700 },
-  heat: { textAlign: "right", paddingVertical: 3, paddingHorizontal: 6, alignSelf: "flex-end" },
+  heat: {
+    textAlign: "right",
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    alignSelf: "flex-end",
+  },
   // Value sits in a fixed slot on the left, the bar grows rightwards from it and ends in
   // whitespace before the next column, so a number never touches a neighbouring bar.
   barCell: { height: 22, flexDirection: "row", alignItems: "center", gap: 8 },
   barValue: { textAlign: "right" },
+  // Narrow: value on top, bar underneath spanning the column, so close values still read as
+  // different lengths instead of a 20px stub beside the number.
+  barCellNarrow: { flexDirection: "column", alignItems: "stretch", gap: 3 },
+  barValueNarrow: { textAlign: "left" },
   barTrack: { flex: 1, justifyContent: "center" },
   barTall: { height: 22 },
   barThin: { height: 12 },
+  barTallNarrow: { height: 6, borderRadius: 1 },
+  barThinNarrow: { height: 4, borderRadius: 1 },
   groupHead: {
     flexDirection: "row",
     alignItems: "center",
@@ -371,9 +518,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
   },
-  groupLabel: { flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 8 },
+  groupLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 8,
+  },
   date: { flexShrink: 0 },
   subtotal: { fontFamily: fonts.sans400, fontSize: 12, ...tabular },
   suffix: { flexShrink: 1 },
-  totalRow: { flexDirection: "row", gap: COL_GAP, paddingTop: 10, paddingBottom: 6 },
+  totalRow: {
+    flexDirection: "row",
+    gap: COL_GAP,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
 });
