@@ -14,6 +14,7 @@ import {
   toNumber,
   trendColor,
 } from "./charts/format";
+import { ensureContrast } from "../lib/color";
 import { fonts, tabular } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { Card } from "./Card";
@@ -34,12 +35,16 @@ const SUM_RE = /revenue|rooms_sold|rooms|count|total/i;
 const LABEL_OVERRIDES: Record<string, string> = { name: "Property", property_name: "Property", property: "Property" };
 
 const FLEX_BY_ROLE: Record<Role, number> = { label: 1.1, bar: 1.3, heat: 0.7 };
+const FLEX_BY_ROLE_NARROW: Record<Role, number> = { label: 1.5, bar: 1.2, heat: 0.7 };
 // Fixed value slots so the numbers form a column under the header and the bar starts at one x.
-const VALUE_W = { currency: 84, count: 64 } as const;
-const slotOf = (c: string) => (CURRENCY_RE.test(c) ? VALUE_W.currency : VALUE_W.count);
+// Narrow (phone / iframe) widths shrink the value slot and column gap so a label plus two bar columns
+// fit without horizontal scrolling; the bar track absorbs the rest.
+const VALUE_W = { wide: { currency: 84, count: 64 }, narrow: { currency: 62, count: 46 } } as const;
 
 export function PropertyTable({ title, columns: inputColumns, rows, groupBy, seriesOrder }: Props) {
-  const { t, wide } = useTheme();
+  const { t, wide, scheme } = useTheme();
+  const slotOf = (c: string) => VALUE_W[wide ? "wide" : "narrow"][CURRENCY_RE.test(c) ? "currency" : "count"];
+  const gap = wide ? COL_GAP : NARROW_GAP;
 
   const labelCol = inputColumns.find((c) =>
     rows.some((r) => r[c] != null && !isNumeric(r[c])),
@@ -112,7 +117,7 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
       })(),
     });
 
-  const flexOf = (i: number) => FLEX_BY_ROLE[roles[columns[i]]];
+  const flexOf = (i: number) => (wide ? FLEX_BY_ROLE : FLEX_BY_ROLE_NARROW)[roles[columns[i]]];
   const isLast = (i: number) => i === columns.length - 1;
   // Bar columns are value-then-bar, so their header sits over the value slot on the left;
   // only a trailing heat column right-aligns.
@@ -146,7 +151,11 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
   const cell = (c: string, i: number, r: Record<string, unknown>) => {
     const rampColor =
       groupBy && labelCol && seriesOrder
-        ? trendColor(t, { order: seriesOrder[String(r[labelCol]).trim()] }, Object.keys(seriesOrder).length > 1)
+        ? ensureContrast(
+            trendColor(t, { order: seriesOrder[String(r[labelCol]).trim()] }, Object.keys(seriesOrder).length > 1),
+            t.bg.card,
+            scheme,
+          )
         : undefined;
     const raw = r[c];
     const style = [styles.cell, { flex: flexOf(i) }];
@@ -223,8 +232,8 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.inner}>
-          <View style={[styles.headerRow, { borderBottomColor: t.border.strong }]}>
+        <View style={[styles.inner, wide ? styles.innerWide : null]}>
+          <View style={[styles.headerRow, { gap, borderBottomColor: t.border.strong }]}>
             {columns.map((c, i) => (
               <View key={c} style={{ flex: flexOf(i) }}>
                 <Text style={[styles.headText, { color: t.text.secondary, textAlign: alignOf(i) }]}>
@@ -249,6 +258,7 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                         return [
                           styles.groupHead,
                           {
+                            gap,
                             backgroundColor: t.bg.panel,
                             borderBottomColor: hovered ? t.border.strongHover : t.border.strong,
                           },
@@ -278,8 +288,11 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                               style={[
                                 styles.subtotal,
                                 { color: t.text.secondary },
-                                // Bar columns: same fixed slot as the row values so the digits line up.
-                                roles[c] === "bar" ? { width: slotOf(c), textAlign: "right" } : { textAlign: alignOf(i) },
+                                // Bar columns: same fixed slot as the row values so the digits line up
+                                // (wide only; the narrow slot is too small for the "avg" prefix).
+                                roles[c] === "bar" && wide
+                                  ? { width: slotOf(c), textAlign: "right" }
+                                  : { textAlign: alignOf(i) },
                               ]}
                             >
                               {subtotalFor(c, g.rows)}
@@ -290,7 +303,7 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                     </Pressable>
                     {open &&
                       g.rows.map((r, ri) => (
-                        <View key={ri} style={[styles.row, { borderBottomColor: t.border.row }]}>
+                        <View key={ri} style={[styles.row, { gap, borderBottomColor: t.border.row }]}>
                           {columns.map((c, i) => cell(c, i, r))}
                         </View>
                       ))}
@@ -298,12 +311,12 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
                 );
               })
             : rows.map((r, ri) => (
-                <View key={ri} style={[styles.row, { borderBottomColor: t.border.row }]}>
+                <View key={ri} style={[styles.row, { gap, borderBottomColor: t.border.row }]}>
                   {columns.map((c, i) => cell(c, i, r))}
                 </View>
               ))}
           {!groupBy && (
-          <View style={styles.totalRow}>
+          <View style={[styles.totalRow, { gap }]}>
             {columns.map((c, i) => (
               <View key={c} style={{ flex: flexOf(i) }}>
                 <Text
@@ -323,12 +336,14 @@ export function PropertyTable({ title, columns: inputColumns, rows, groupBy, ser
 }
 
 const COL_GAP = 20;
+const NARROW_GAP = 10;
 
 const styles = StyleSheet.create({
   card: { paddingTop: 16, paddingHorizontal: 18, paddingBottom: 10 },
   title: { fontFamily: fonts.sans700, fontSize: 13, marginBottom: 10 },
   scrollContent: { flexGrow: 1 },
-  inner: { minWidth: 520, flex: 1 },
+  inner: { flex: 1 },
+  innerWide: { minWidth: 520 },
   headerRow: { flexDirection: "row", gap: COL_GAP, paddingVertical: 8, borderBottomWidth: 1 },
   headText: { fontFamily: fonts.sans600, fontSize: 12 },
   row: {
