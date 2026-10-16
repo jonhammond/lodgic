@@ -2,7 +2,7 @@
 
 ## ADR rate/volume charts (2026-10-15 leftovers)
 
-- [ ] `/fn-deploy` the summary prompt change (commit d770fd4); production still runs the old summary prompt. Manual only.
+- [x] `/fn-deploy` the summary prompt change (commit d770fd4); production still runs the old summary prompt. Manual only.
 
 ## Visual QA findings (2026-10-15, chart-reviewer)
 
