@@ -282,7 +282,7 @@ Deno.test("chart-form rules are appended after every earlier Rules bullet and ex
     bullets[explicit].includes("never pick scatter, pie, stacked_bar or combo"),
     "missing never-pick statement",
   );
-  for (const phrase of EXPLICIT_FORM_TRIGGERS) {
+  for (const { phrase } of EXPLICIT_FORM_TRIGGERS) {
     assert(
       bullets[explicit].toLowerCase().includes(phrase),
       `trigger "${phrase}" missing from the explicit-form rule`,

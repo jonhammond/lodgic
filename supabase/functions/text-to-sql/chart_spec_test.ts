@@ -230,9 +230,22 @@ Deno.test("legacy kinds force spec null without a log", () => {
 });
 
 Deno.test("requestsExplicitForm fires on each trigger phrase, case-insensitively", () => {
-  for (const t of EXPLICIT_FORM_TRIGGERS) {
-    assert(requestsExplicitForm(`Show a ${t} view`), `missed: ${t}`);
-    assert(requestsExplicitForm(t.toUpperCase()), `case: ${t}`);
+  for (const { phrase } of EXPLICIT_FORM_TRIGGERS) {
+    const t = phrase.replace("\u2026", "occupancy");
+    assert(requestsExplicitForm(`Show a ${t} view`), `missed: ${phrase}`);
+    assert(requestsExplicitForm(t.toUpperCase()), `case: ${phrase}`);
+  }
+});
+
+Deno.test("requestsExplicitForm fires on dual-axis and bars-with-line wording", () => {
+  for (
+    const q of [
+      "Revenue bars with occupancy line by property",
+      "revenue vs occupancy on a dual axis",
+      "bar chart with a line for occupancy",
+    ]
+  ) {
+    assert(requestsExplicitForm(q), `missed: ${q}`);
   }
 });
 
@@ -244,8 +257,59 @@ Deno.test("requestsExplicitForm is false for plain comparisons", () => {
       "NPS and CSAT by segment",
       "ADR vs occupancy by property",
       "Occupied rooms by property",
+      "Direct share of bookings by property",
+      "Top properties by RevPAR",
     ]
   ) {
     assert(!requestsExplicitForm(q), `false positive: ${q}`);
   }
+});
+
+Deno.test("numeric check spans all rows: null first row ok, later non-numeric fails", () => {
+  const nullFirst = rowsN(5);
+  (nullFirst[0] as Record<string, unknown>).adr = null;
+  assert(
+    captureLogs(() =>
+      validateSpec("combo", { x: "name", y: ["adr"], y2: "occ" }, nullFirst)
+    ).result.chart === "combo",
+    "null in row 0 but numeric later passes",
+  );
+  const bad = rowsN(5);
+  (bad[3] as Record<string, unknown>).adr = "n/a";
+  const r =
+    captureLogs(() =>
+      validateSpec("combo", { x: "name", y: ["adr"], y2: "occ" }, bad)
+    ).result;
+  assert(r.chart === "bar" && r.spec === null, "later non-numeric fails");
+  const allNull = rowsN(5).map((r) => ({ ...r, adr: null }));
+  assert(
+    captureLogs(() =>
+      validateSpec("combo", { x: "name", y: ["adr"], y2: "occ" }, allNull)
+    ).result.chart === "bar",
+    "all-null column fails",
+  );
+});
+
+Deno.test("scatter x must be numeric; inherited keys are not columns", () => {
+  assert(
+    captureLogs(() =>
+      validateSpec("scatter", { x: "name", y: ["occ"] }, rowsN(5))
+    ).result.chart === "bar",
+    "non-numeric scatter x",
+  );
+  const { result } = captureLogs(() =>
+    validateSpec("scatter", { x: "constructor", y: ["occ"] }, rowsN(5))
+  );
+  assert(result.chart === "bar" && result.spec === null, "constructor x");
+  assert(result.reason === "unknown column constructor", "reason");
+});
+
+Deno.test("spec_dropped reason truncates long model-supplied column names", () => {
+  const { result } = captureLogs(() =>
+    validateSpec("pie", { x: "name", y: ["z".repeat(500)] }, rowsN(3))
+  );
+  assert(
+    result.reason !== undefined && result.reason.length < 100,
+    "reason truncated",
+  );
 });

@@ -130,7 +130,7 @@ Schema (schema public):
     mpi numeric (generated: occupancy_pct / market_occupancy_pct * 100),
     ari numeric (generated: adr / market_adr * 100),
     rgi numeric (generated: revpar / market_revpar * 100),
-    nps numeric (-100..100), csat numeric (1-5 scale, stored 0-5), repeat_guest_pct numeric (0-100),
+    nps numeric (-100..100), csat numeric (customer satisfaction, 1-5 scale (stored 0-5), score not %), repeat_guest_pct numeric (0-100),
     rooms_cleaned int, housekeeping_hours numeric,
     unique(property_id, metric_date))
   adr = total_revenue / rooms_sold; occupancy_pct is a percentage (0-100); revpar = revenue per available room.
@@ -185,7 +185,7 @@ Rules:
 - report_title: a short human-readable title.
 - caveat: optional single sentence a reader needs before trusting the result, e.g. a requested metric is not tracked so a proxy is used, or the period is partial (month-to-date). Leave empty when there is none.
 - period_label: the period the query actually covers, as a short phrase such as "Last 30 days", "Last 60 days", "Month to date", "Yesterday". period_source: "question" when the question named the period, "default" when the missing-period rule supplied it.
-- Explicit chart form - overrides the bar default above, only when the question contains "scatter", "pie", "donut", "share of", "stacked", "combo", "bar and line", or "second axis": scatter -> scatter; pie / donut / share of -> pie; stacked -> stacked_bar; combo / bar and line / on a second axis -> combo. Shape the SQL for it and fill chart_spec {x, y, y2, label} with the exact column aliases used in the SQL. When none of those words appear, never pick scatter, pie, stacked_bar or combo; 'X vs Y' on its own is not a chart-form request, so apply the earlier rules exactly as if this bullet did not exist.
+- Explicit chart form - overrides the bar default above, only when the question contains "scatter", "pie", "donut", "stacked", "combo", "bar and line", "second axis", "dual axis", "two axes", "secondary axis", "right axis", "bar chart with a line", or "bars with … line": scatter -> scatter; pie / donut -> pie; stacked -> stacked_bar; combo / bar and line / second axis / dual axis / two axes / secondary axis / right axis / bar chart with a line / bars with … line -> combo. Shape the SQL for it and fill chart_spec {x, y, y2, label} with the exact column aliases used in the SQL. When none of those words appear, never pick scatter, pie, stacked_bar or combo; 'X vs Y' on its own is not a chart-form request, so apply the earlier rules exactly as if this bullet did not exist.
 - SQL shape per chart form (only when one of the forms above was requested): scatter = name, <x_metric>, <y_metric> one row per property (chart_spec x = x_metric alias, y = [y_metric alias], label = name); pie = <label>, <value> with at most 8 rows (x = label, y = [value]); stacked_bar = name, <part1>, <part2>, ... wide format, one column per part (x = name, y = all part aliases); combo = <x>, <bar_metric>, <line_metric> (x = <x>, y = [bar_metric], y2 = line_metric).
 - chart_spec is null for bar, line, kpi and table; all other recommended_chart behaviour is unchanged.`;
 

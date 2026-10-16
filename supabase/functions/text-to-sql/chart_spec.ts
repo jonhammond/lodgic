@@ -11,16 +11,33 @@ export const SCATTER_MIN_ROWS = 3;
 
 type Row = Record<string, unknown>;
 
-/** Lowercase phrases that explicitly request a scatter, pie, stacked bar or combo form. */
-export const EXPLICIT_FORM_TRIGGERS: readonly string[] = [
-  "scatter",
-  "pie",
-  "donut",
-  "share of",
-  "stacked",
-  "combo",
-  "bar and line",
-  "second axis",
+export interface ExplicitFormTrigger {
+  /** Wording listed in the explicit-chart-form prompt rule (lowercase). */
+  phrase: string;
+  pattern: RegExp;
+}
+
+/** Case-insensitive, leading word boundary, no trailing boundary ("pies", "stacked bar"). */
+const trigger = (phrase: string, source = phrase): ExplicitFormTrigger => ({
+  phrase,
+  pattern: new RegExp(`\\b${source}`, "i"),
+});
+
+/** Phrases that explicitly request a scatter, pie, stacked bar or combo form. */
+export const EXPLICIT_FORM_TRIGGERS: readonly ExplicitFormTrigger[] = [
+  trigger("scatter"),
+  trigger("pie"),
+  trigger("donut"),
+  trigger("stacked"),
+  trigger("combo"),
+  trigger("bar and line"),
+  trigger("second axis"),
+  trigger("dual axis"),
+  trigger("two axes"),
+  trigger("secondary axis"),
+  trigger("right axis"),
+  trigger("bar chart with a line"),
+  trigger("bars with \u2026 line", "bars? with .{0,40}?line"),
 ];
 
 /**
@@ -28,8 +45,7 @@ export const EXPLICIT_FORM_TRIGGERS: readonly string[] = [
  * "occupied" via "pie"); the new chart kinds are never inferred.
  */
 export function requestsExplicitForm(question: string): boolean {
-  const q = question.toLowerCase();
-  return EXPLICIT_FORM_TRIGGERS.some((t) => new RegExp(`\\b${t}`).test(q));
+  return EXPLICIT_FORM_TRIGGERS.some((t) => t.pattern.test(question));
 }
 
 export function isSpecChart(chart: Chart): chart is SpecChart {
@@ -63,7 +79,13 @@ function isNumeric(v: unknown): boolean {
   return typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v));
 }
 
-function failure(spec: ChartSpec | null, rows: Row[]): string | null {
+const clip = (col: string) => col.length > 64 ? `${col.slice(0, 64)}...` : col;
+
+function failure(
+  chart: SpecChart,
+  spec: ChartSpec | null,
+  rows: Row[],
+): string | null {
   if (spec === null) return "no usable chart_spec";
   const first = rows[0];
   if (!first) return "no rows";
@@ -71,10 +93,19 @@ function failure(spec: ChartSpec | null, rows: Row[]): string | null {
   if (spec.y2) refs.push(spec.y2);
   if (spec.label) refs.push(spec.label);
   for (const col of refs) {
-    if (!(col in first)) return `unknown column ${col}`;
+    if (!Object.hasOwn(first, col)) return `unknown column ${clip(col)}`;
   }
-  for (const col of [...spec.y, ...(spec.y2 ? [spec.y2] : [])]) {
-    if (!isNumeric(first[col])) return `non-numeric column ${col}`;
+  const numeric = [...spec.y, ...(spec.y2 ? [spec.y2] : [])];
+  if (chart === "scatter") numeric.push(spec.x);
+  for (const col of numeric) {
+    let any = false;
+    for (const r of rows) {
+      const v = r[col];
+      if (v === null || v === undefined) continue;
+      if (!isNumeric(v)) return `non-numeric column ${clip(col)}`;
+      any = true;
+    }
+    if (!any) return `no numeric values in column ${clip(col)}`;
   }
   return null;
 }
@@ -111,7 +142,7 @@ export function validateSpec(
   rows: Row[],
 ): { chart: Chart; spec: ChartSpec | null; reason?: string } {
   if (!isSpecChart(chart)) return { chart, spec: null };
-  const reason = failure(spec, rows) ??
+  const reason = failure(chart, spec, rows) ??
     kindFailure(chart, spec as ChartSpec, rows);
   if (reason === null) return { chart, spec };
   console.log(JSON.stringify({ spec_dropped: reason }));
