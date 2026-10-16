@@ -230,30 +230,32 @@ Deno.test("system and summary prompts both carry the direction line", () => {
   }
 });
 
-Deno.test("chart-form rules are appended after every earlier Rules bullet and phrasing-scoped", () => {
+Deno.test("chart-form rules are appended after every earlier Rules bullet and explicit-only", () => {
   const rules = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf("\nRules:"));
   const bullets = rules.split("\n- ");
   const idx = (needle: string) => bullets.findIndex((b) => b.includes(needle));
-  const scope = idx("Chart-form rules (this and the next three bullets)");
   const explicit = idx("Explicit chart form");
-  assert(scope === explicit - 1, "scope bullet must precede explicit rule");
-  const noFit = idx("No-fit chart form");
   const shape = idx("SQL shape per chart form");
   const nullSpec = idx("chart_spec is null for bar, line, kpi and table");
   assert(
     explicit > idx("period_label: the period"),
     "must follow period bullet",
   );
-  assert(noFit === explicit + 1, "no-fit rule must follow explicit rule");
-  assert(shape === noFit + 1, "shape rule must follow no-fit rule");
+  assert(shape === explicit + 1, "shape rule must follow explicit rule");
   assert(nullSpec === shape + 1, "null-spec rule must follow shape rule");
   assert(nullSpec === bullets.length - 1, "chart-form rules must be last");
-  const block = bullets.slice(explicit).join("\n- ");
+  assert(!SYSTEM_PROMPT.includes("No-fit"), "inference rule must stay removed");
+  assert(
+    bullets[explicit].includes("never pick scatter, pie, stacked_bar or combo"),
+    "missing never-pick statement",
+  );
   for (const kind of ["scatter", "pie", "stacked_bar", "combo"]) {
-    assert(block.includes(kind), `missing ${kind}`);
+    assert(bullets[shape].includes(kind), `missing ${kind}`);
   }
   assert(
-    block.includes("all other recommended_chart behaviour is unchanged"),
+    bullets[nullSpec].includes(
+      "all other recommended_chart behaviour is unchanged",
+    ),
     "missing unchanged statement",
   );
 });
