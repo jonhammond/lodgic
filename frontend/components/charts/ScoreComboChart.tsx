@@ -182,6 +182,20 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
                     },
               }}
             />
+            {/* Card-colour halo keeps the line readable where it crosses bars of similar brightness (dark pink). */}
+            <VictoryLine
+              name="line-halo"
+              interpolation="linear"
+              data={dots}
+              style={{
+                data: {
+                  stroke: t.bg.card,
+                  strokeWidth: 5.5,
+                  strokeLinejoin: "round",
+                  strokeLinecap: "round",
+                },
+              }}
+            />
             <VictoryLine
               name="line"
               interpolation="linear"
