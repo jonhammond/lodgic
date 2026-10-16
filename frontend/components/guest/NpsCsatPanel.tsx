@@ -98,6 +98,12 @@ export function NpsCsatPanel({ properties, selectedIds, initialTimeframe, onRows
   );
   const activeHotel = hotelId ? (hotels.find((h) => h.id === hotelId) ?? null) : null;
 
+  // Persist the clearing: re-adding properties in the picker must not resurrect old selections.
+  const segmentGone = ready !== null && segment !== null && activeSegment === null;
+  const hotelGone = ready !== null && hotelId !== null && activeHotel === null;
+  if (segmentGone) setSegmentState(null);
+  if (segmentGone || hotelGone) setHotelId(null);
+
   const trend = useMemo(() => {
     if (!ready || !activeHotel || !activeSegment) return null;
     const buckets = trendBuckets(ready.rows, timeframe, ready.latestDate);
@@ -184,7 +190,7 @@ export function NpsCsatPanel({ properties, selectedIds, initialTimeframe, onRows
   const empty =
     selected.length === 0
       ? "Select at least one property."
-      : segments.length === 0
+      : segments.length === 0 || segments.every((s) => s.roomsSold === 0)
         ? "No data for the selected properties."
         : null;
 
