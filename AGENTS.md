@@ -2,7 +2,7 @@
 
 ## Project
 
-Hospitality analytics AI demo: natural-language questions → Gemini 3.1 Flash-Lite generates SQL → executed read-only in Supabase → KPI tiles / charts / tables. Public (no auth), rate-limited, embedded in a portfolio site via iframe. Plan: `HOSP_DATA_ANALYTICS_APP_PLAN.md` (phases 0–3 done locally; 4 deploy pending; production DB untouched).
+Hospitality analytics AI demo: natural-language questions → Gemini 3.1 Flash-Lite generates SQL → executed read-only in Supabase → KPI tiles / charts / tables. Public (no auth), rate-limited, embedded in a portfolio site via iframe. Deployed: frontend on Vercel (lodgic.jonhammond.org), Edge Function + schema in the production Supabase project. Open items in `TODO.md`.
 
 ## Boundaries
 

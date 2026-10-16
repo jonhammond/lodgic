@@ -54,5 +54,3 @@ Deno is not installed on the host; run `deno check/test/lint/fmt` for the Edge F
 - ✅ Portfolio expansion — 10 hotels, 14 operating metrics, RPC hardening
 - ✅ Property filter + theme toggle
 - 🔄 Open items tracked in [TODO.md](TODO.md)
-
-Full plan: [HOSP_DATA_ANALYTICS_APP_PLAN.md](HOSP_DATA_ANALYTICS_APP_PLAN.md)
