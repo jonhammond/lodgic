@@ -146,6 +146,7 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
                   ? [
                       r.name,
                       `RevPAR ${formatCurrency(r.revpar)}`,
+                      `ADR ${formatCurrency(r.adr)}`,
                       `Occupancy ${formatPercent(r.occupancy * 100)}`,
                       TIER_TEXT[r.tier],
                     ]
