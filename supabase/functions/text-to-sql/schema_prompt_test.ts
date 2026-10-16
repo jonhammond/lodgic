@@ -272,8 +272,10 @@ Deno.test("chart-form rules are appended after every earlier Rules bullet and ex
   assert(nullSpec === shape + 1, "null-spec rule must follow shape rule");
   assert(nullSpec === bullets.length - 1, "chart-form rules must be last");
   assert(
-    bullets[explicit].includes("comparison, not a scatter"),
-    "missing negative example",
+    bullets[explicit].includes(
+      "apply the earlier rules exactly as if this bullet did not exist",
+    ),
+    "missing neutral fallback clause",
   );
   assert(!SYSTEM_PROMPT.includes("No-fit"), "inference rule must stay removed");
   assert(
