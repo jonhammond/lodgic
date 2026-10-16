@@ -215,7 +215,7 @@ export function NpsCsatPanel({ properties, selectedIds, initialTimeframe, onRows
               note={`${hotels.length} ${hotels.length === 1 ? "hotel" : "hotels"}, ${tfLabel}`}
               selectedIndex={activeHotel ? hotels.findIndex((h) => h.id === activeHotel.id) : null}
               onSelect={(i) => setHotelId(hotels[i]?.id ?? null)}
-              footer={<Button variant="text" label="All segments" onPress={() => setSegment(null)} />}
+              footer={<Button variant="text" label="Close Chart" onPress={() => setSegment(null)} />}
             />
           ) : null}
           {activeSegment && activeHotel && trend ? (
@@ -225,7 +225,7 @@ export function NpsCsatPanel({ properties, selectedIds, initialTimeframe, onRows
               trend={trend}
               hotelName={activeHotel.name}
               segmentLabel={SEGMENT_LABEL[activeSegment]}
-              footer={<Button variant="text" label="All hotels" onPress={() => setHotelId(null)} />}
+              footer={<Button variant="text" label="Close Chart" onPress={() => setHotelId(null)} />}
             />
           ) : null}
         </>
