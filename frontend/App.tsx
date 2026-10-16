@@ -355,6 +355,8 @@ function AppInner() {
               facts={mapped?.facts ?? []}
               caveat={result?.caveat ?? null}
               errorMessage={errorMessage}
+              period={result?.period_label ?? null}
+              periodSource={result?.period_source ?? null}
               rowCount={result?.rows.length ?? null}
               durationMs={result?.duration_ms ?? null}
               sql={result?.sql ?? null}

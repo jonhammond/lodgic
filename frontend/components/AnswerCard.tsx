@@ -11,6 +11,8 @@ type Props = {
   facts: string[];
   caveat: string | null;
   errorMessage: string | null;
+  period: string | null;
+  periodSource: "question" | "default" | null;
   rowCount: number | null;
   durationMs: number | null;
   sql: string | null;
@@ -29,6 +31,8 @@ export function AnswerCard({
   facts,
   caveat,
   errorMessage,
+  period,
+  periodSource,
   rowCount,
   durationMs,
   sql,
@@ -38,6 +42,7 @@ export function AnswerCard({
 }: Props) {
   const { t } = useTheme();
   const meta = [
+    period ? (periodSource === "default" ? `${period} (default)` : period) : null,
     rowCount != null ? `${rowCount} rows` : null,
     durationMs != null ? `${durationMs} ms` : null,
   ]

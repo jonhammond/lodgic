@@ -1,9 +1,16 @@
 // Supabase Edge Function: text-to-sql
 // POST { prompt, property_ids? (UUID[], <=50; scopes SQL to those properties; [] = no rows) } -> Gemini Flash-Lite (GEMINI_MODEL, fallback GEMINI_FALLBACK_MODEL on 429)
-//   -> validated read-only SQL -> run_hotel_analytics RPC.
+//   -> validated read-only SQL -> run_hotel_analytics RPC. Output also carries period_label /
+//   period_source (question | default); questions naming no period default to the last 30 days.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { validateSql } from "./sql_guard.ts";
-import { CHARTS, SYSTEM_PROMPT } from "./schema_prompt.ts";
+import {
+  CHARTS,
+  parsePeriod,
+  PERIOD_SOURCES,
+  type PeriodSource,
+  SYSTEM_PROMPT,
+} from "./schema_prompt.ts";
 import { parsePropertyIds, scopePrompt } from "./request.ts";
 import {
   CACHE_BYPASS_HEADER,
@@ -53,8 +60,16 @@ const RESPONSE_SCHEMA = {
     recommended_chart: { type: "STRING", enum: [...CHARTS] },
     report_title: { type: "STRING" },
     caveat: { type: "STRING" },
+    period_label: { type: "STRING" },
+    period_source: { type: "STRING", enum: [...PERIOD_SOURCES] },
   },
-  required: ["sql", "recommended_chart", "report_title"],
+  required: [
+    "sql",
+    "recommended_chart",
+    "report_title",
+    "period_label",
+    "period_source",
+  ],
 };
 
 const SUMMARY_TIMEOUT_MS = 8_000;
@@ -174,6 +189,8 @@ type GeminiOutput = {
   recommended_chart: (typeof CHARTS)[number];
   report_title: string;
   caveat?: string;
+  period_label: string | null;
+  period_source: PeriodSource | null;
 };
 
 type CacheRow = {
@@ -181,6 +198,8 @@ type CacheRow = {
   chart: GeminiOutput["recommended_chart"];
   title: string;
   caveat: string;
+  period_label: string | null;
+  period_source: PeriodSource | null;
   rows_hash: string | null;
   summary: string | null;
   hits: number;
@@ -281,6 +300,7 @@ async function callGemini(
       throw new Error("shape");
     }
     out.caveat = typeof out.caveat === "string" ? out.caveat.trim() : "";
+    Object.assign(out, parsePeriod(out));
     return out as GeminiOutput;
   } catch {
     throw new ApiError(
@@ -378,7 +398,9 @@ async function handle(
   if (!bypass) {
     const { data, error } = await supabase
       .from("ai_sql_cache")
-      .select("sql, chart, title, caveat, rows_hash, summary, hits, created_at")
+      .select(
+        "sql, chart, title, caveat, period_label, period_source, rows_hash, summary, hits, created_at",
+      )
       .eq("cache_key", key)
       .maybeSingle();
     if (error) console.warn("ai_sql_cache lookup failed", error.code);
@@ -449,6 +471,7 @@ async function handle(
       recommended_chart: cached.chart,
       report_title: cached.title,
       caveat: cached.caveat,
+      ...parsePeriod(cached),
     };
   } else {
     gen = await callGemini(scoped, geminiKey, geminiModel, geminiFallbackModel);
@@ -518,6 +541,8 @@ async function handle(
       chart: gen.recommended_chart,
       title: gen.report_title,
       caveat: gen.caveat ?? "",
+      period_label: gen.period_label,
+      period_source: gen.period_source,
       model: geminiModel,
       rows_hash: rowsHash,
       summary,
@@ -536,6 +561,8 @@ async function handle(
       title: gen.report_title,
       rows: resultRows,
       caveat: gen.caveat || null,
+      period_label: gen.period_label,
+      period_source: gen.period_source,
       summary,
       cached: cached !== null,
       duration_ms: durationMs,

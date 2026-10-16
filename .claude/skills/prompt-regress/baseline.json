@@ -10,17 +10,21 @@
       "rooms_sold"
     ],
     "rowCount": 310,
+    "period_label": "Last 30 days",
+    "period_source": "question",
     "error": null
   },
   {
     "question": "RevPAR vs occupancy",
     "chart": "kpi",
-    "title": "Portfolio RevPAR vs Occupancy (Last 30 Days)",
+    "title": "Portfolio RevPAR and Occupancy",
     "columns": [
-      "avg_occupancy",
-      "avg_revpar"
+      "occupancy_pct",
+      "revpar"
     ],
     "rowCount": 1,
+    "period_label": "Last 30 days",
+    "period_source": "default",
     "error": null
   },
   {
@@ -32,39 +36,47 @@
       "occupancy_pct"
     ],
     "rowCount": 10,
+    "period_label": "Last 30 days",
+    "period_source": "default",
     "error": null
   },
   {
     "question": "Revenue by property this month",
     "chart": "bar",
-    "title": "Total Revenue by Property (Month-to-Date)",
+    "title": "Revenue by Property - Month to Date",
     "columns": [
       "name",
       "total_revenue"
     ],
     "rowCount": 10,
+    "period_label": "Month to date",
+    "period_source": "question",
     "error": null
   },
   {
     "question": "Total revenue yesterday",
     "chart": "bar",
-    "title": "Total Revenue by Property Yesterday",
+    "title": "Total Revenue by Property - Yesterday",
     "columns": [
       "name",
       "total_revenue"
     ],
     "rowCount": 10,
+    "period_label": "Yesterday",
+    "period_source": "question",
     "error": null
   },
   {
     "question": "Direct booking ratio by property, last 30 days",
     "chart": "bar",
-    "title": "Direct Booking Ratio by Property (Last 30 Days)",
+    "title": "Direct Booking Ratio by Property",
     "columns": [
       "direct_booking_ratio",
       "name"
     ],
     "rowCount": 10,
+    "period_label": "Last 30 days",
+    "period_source": "question",
     "error": null
   },
   {
@@ -77,18 +89,22 @@
       "name"
     ],
     "rowCount": 10,
+    "period_label": "Last 30 days",
+    "period_source": "default",
     "error": null
   },
   {
     "question": "RGI trend, last 60 days",
     "chart": "line",
-    "title": "RGI Trend (Last 60 Days)",
+    "title": "RGI Trend by Property",
     "columns": [
       "name",
       "rgi",
       "week_ending"
     ],
-    "rowCount": 100,
+    "rowCount": 90,
+    "period_label": "Last 60 days",
+    "period_source": "question",
     "error": null
   },
   {
@@ -101,6 +117,8 @@
       "segment"
     ],
     "rowCount": 5,
+    "period_label": "Last 30 days",
+    "period_source": "default",
     "error": null
   }
 ]

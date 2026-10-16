@@ -1,5 +1,24 @@
 export const CHARTS = ["bar", "line", "kpi", "table"] as const;
 
+export const PERIOD_SOURCES = ["question", "default"] as const;
+export type PeriodSource = (typeof PERIOD_SOURCES)[number];
+
+/** Longest period_label the UI meta line will show; longer values are treated as unusable. */
+export const PERIOD_LABEL_MAX = 40;
+
+/** Lenient: unusable values become null; never fails the request. */
+export function parsePeriod(
+  out: unknown,
+): { period_label: string | null; period_source: PeriodSource | null } {
+  const o = (out ?? {}) as Record<string, unknown>;
+  const raw = typeof o.period_label === "string" ? o.period_label.trim() : "";
+  const label = raw.length <= PERIOD_LABEL_MAX ? raw : "";
+  const source = PERIOD_SOURCES.includes(o.period_source as PeriodSource)
+    ? (o.period_source as PeriodSource)
+    : null;
+  return { period_label: label || null, period_source: source };
+}
+
 // Every column the model may reference; schema_prompt_test.ts asserts each appears in SYSTEM_PROMPT.
 export const METRIC_COLUMNS: readonly string[] = [
   // properties
@@ -87,6 +106,7 @@ Rules:
 - Housekeeping efficiency = sum(rooms_cleaned)::numeric / nullif(sum(housekeeping_hours), 0) rooms per labor hour (higher is better); minutes per room = 60 / that.
 - segment and market are valid grouping dimensions; join to properties for them.
 - Use current_date for relative dates (e.g. last 30 days: metric_date >= current_date - 30).
+- Missing period - only when the question names no date, day or range at all (nothing like "last N days", "this month", "this week", "yesterday", "today", a month name or a date): add the filter metric_date >= current_date - 30. This rule only fills in a period the question left out; it never replaces a period the question names, a single-day question ("yesterday", "today") stays that one day, and it does not change grouping, columns, row shape or recommended_chart.
 - Round numeric outputs to 2 decimals, give columns short snake_case aliases, order sensibly (time series ascending by date), and keep result sets small (add limit; default at most 100 rows unless a rule below sets a higher limit).
 - Ranking questions ("top/best/highest/lowest property by X") return every property ranked: name first, the metric second, ordered by the metric, limit 10 - never only the winner. recommended_chart: bar.
 - A question asking for a total, sum or count of an additive metric (total_revenue, rooms_sold, bookings, direct_bookings, ota_bookings, gds_bookings, group_bookings, cancellations, any *_cost, gop, rooms_cleaned, housekeeping_hours) over one period is NOT a request for a single number: return one row per property (name, metric) ordered desc, recommended_chart: bar; the UI adds up the portfolio total. Example: "Total revenue yesterday" -> select p.name, round(sum(d.total_revenue), 2) as total_revenue from daily_metrics d join properties p on d.property_id = p.id where d.metric_date = current_date - 1 group by p.name order by total_revenue desc limit 100. Ratio metrics asked at portfolio level (ADR, occupancy, RevPAR, CPOR, MPI/ARI/RGI, NPS, CSAT) stay single-row kpi.
@@ -96,4 +116,5 @@ Rules:
 - total_rooms lives on properties, not daily_metrics: any occupancy or RevPAR formula using it must join properties.
 - recommended_chart: line for time series, bar for category comparisons and the ranking and total cases above, kpi for a single-row single-value answer, table otherwise.
 - report_title: a short human-readable title.
-- caveat: optional single sentence a reader needs before trusting the result, e.g. a requested metric is not tracked so a proxy is used, or the period is partial (month-to-date). Leave empty when there is none.`;
+- caveat: optional single sentence a reader needs before trusting the result, e.g. a requested metric is not tracked so a proxy is used, or the period is partial (month-to-date). Leave empty when there is none.
+- period_label: the period the query actually covers, as a short phrase such as "Last 30 days", "Last 60 days", "Month to date", "Yesterday". period_source: "question" when the question named the period, "default" when the missing-period rule supplied it.`;

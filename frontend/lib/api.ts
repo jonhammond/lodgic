@@ -8,6 +8,8 @@ export type QueryResult = {
   rows: Record<string, unknown>[];
   caveat?: string | null;
   summary?: string | null;
+  period_label?: string | null;
+  period_source?: "question" | "default" | null;
   cached?: boolean;
   duration_ms?: number;
 };

@@ -9,6 +9,7 @@ Prerequisite: the user must start the function first via `!`:
 
 - `bash .claude/skills/prompt-regress/run.sh --record` writes `baseline.json`.
 - `bash .claude/skills/prompt-regress/run.sh` diffs against baseline; exit 1 on drift.
+- Diffed per question: `chart`, `columns`, `period_source` (`question` | `default`), `error`. `title`, `rowCount` and `period_label` are recorded but not diffed (free-text noise).
 
 Requests are spaced 11 s apart (global 30 req/min cap; cache hits exempt, bypass header means every regress request counts); a full run takes ~100 s.
 

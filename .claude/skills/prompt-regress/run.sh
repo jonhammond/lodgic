@@ -32,6 +32,7 @@ for i in $(seq 0 $((N - 1))); do
   ENTRY="$(printf '%s' "$RESP" | jq -c --arg q "$Q" \
     '{question:$q, chart:(.chart // null), title:(.title // null),
       columns:((.rows // [])[0] // {} | keys), rowCount:((.rows // []) | length),
+      period_label:(.period_label // null), period_source:(.period_source // null),
       error:(.error // null)}' 2>/dev/null)" || ENTRY="$(jq -nc --arg q "$Q" '{question:$q,error:"invalid response"}')"
   if [ "$(printf '%s' "$ENTRY" | jq -r '.error.code // empty')" = "rate_limited" ]; then
     echo "aborted: per-IP rate limit hit at question $((i + 1)); wait for the hour window (60 queries/hr)" >&2
@@ -51,8 +52,8 @@ fi
 [ -f "$DIR/baseline.json" ] || { echo "no baseline.json; run with --record" >&2; exit 1; }
 DRIFT=0
 for i in $(seq 0 $((N - 1))); do
-  A="$(jq -c ".[$i] | {question,chart,columns,error}" "$DIR/baseline.json")"
-  B="$(printf '%s' "$RESULT" | jq -c ".[$i] | {question,chart,columns,error}")"
+  A="$(jq -c ".[$i] | {question,chart,columns,period_source,error}" "$DIR/baseline.json")"
+  B="$(printf '%s' "$RESULT" | jq -c ".[$i] | {question,chart,columns,period_source,error}")"
   if [ "$A" != "$B" ]; then
     DRIFT=1
     echo "DRIFT: baseline=$A current=$B"
