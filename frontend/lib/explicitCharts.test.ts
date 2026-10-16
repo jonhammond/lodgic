@@ -307,7 +307,7 @@ test("metricLabel strips ratio suffixes; axisTitle appends the unit", () => {
   assert.equal(axisTitle("rooms_sold", "number"), "Rooms Sold");
 });
 
-test("quadrantOf splits at the medians; ties count as high", () => {
+test("quadrantOf splits at the means; ties count as high", () => {
   const xs = [1, 2, 3, 4, 5];
   const ys = [5, 1, 3, 4, 2];
   const q = xs.map((x, i) => quadrantOf(x, ys[i], 3, 3));

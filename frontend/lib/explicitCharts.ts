@@ -23,13 +23,9 @@ export type ScatterSeries = {
 
 export type Quadrant = "strong" | "weak" | "pricey" | "busy";
 
-const median = (v: number[]): number => {
-  const s = [...v].sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-};
+const mean = (v: number[]): number => v.reduce((a, b) => a + b, 0) / v.length;
 
-/** Quadrant at the medians (ties count as high): strong = high x and y, weak = both low, pricey = high x only, busy = high y only. */
+/** Quadrant at the means (ties count as high): strong = high x and y, weak = both low, pricey = high x only, busy = high y only. */
 export function quadrantOf(x: number, y: number, mx: number, my: number): Quadrant {
   const hx = x >= mx;
   const hy = y >= my;
@@ -130,8 +126,8 @@ function mapScatter(rows: Row[], title: string, x: string, y: string, labelKey: 
     raw.push({ label: textKey === undefined ? String(i + 1) : labelOf(r, textKey) || String(i + 1), x: px, y: py });
   });
   if (raw.length < SCATTER_MIN_POINTS) return null;
-  const mx = median(raw.map((p) => p.x));
-  const my = median(raw.map((p) => p.y));
+  const mx = mean(raw.map((p) => p.x));
+  const my = mean(raw.map((p) => p.y));
   const points = raw.map((p) => ({ ...p, quadrant: quadrantOf(p.x, p.y, mx, my) }));
   return {
     kind: "scatter",

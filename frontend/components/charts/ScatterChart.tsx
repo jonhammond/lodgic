@@ -35,7 +35,7 @@ type Datum = {
   hidden?: boolean;
 };
 
-/** Two-metric correlation: one point per category, coloured by quadrant at the medians. */
+/** Two-metric correlation: one point per category, coloured by quadrant at the means. */
 export function ScatterChart({ series }: { series: ScatterSeries }) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
