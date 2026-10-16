@@ -14,14 +14,12 @@ import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { formatNumber } from "./format";
 import { niceCeil, niceDomain, tickLabel } from "./scale";
-import { pickTickValues } from "./ticks";
+import { axisGutter, pickTickValues } from "./ticks";
+import { chartType } from "./typography";
 
-const PAD = { top: 10, bottom: 22, left: 40, right: 44 };
-const NARROW_W = 360;
-const NARROW_PAD = 36;
+const PAD_TOP = 10;
 const PLOT_H = 200;
 const GAP = 2;
-const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
 
 type Props = {
   name: string;
@@ -36,10 +34,7 @@ export function RateVolumeChart({ name, labels, rate, volume }: Props) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const n = labels.length;
-  const narrow = width > 0 && width < NARROW_W;
-  const pad = narrow ? { ...PAD, left: NARROW_PAD, right: NARROW_PAD } : PAD;
-  const plotW = Math.max(0, width - pad.left - pad.right);
-  const height = PLOT_H + PAD.top + PAD.bottom;
+  const ty = chartType(width);
 
   const { lo, hi, ticks } = useMemo(() => {
     const vs = rate.values.filter((v): v is number => v !== null);
@@ -57,6 +52,18 @@ export function RateVolumeChart({ name, labels, rate, volume }: Props) {
   const toY = (rooms: number) => lo + (rooms / vStep) * gridStep;
   const rightLabel = (y: number) => formatNumber(Math.round(((y - lo) / gridStep) * vStep));
 
+  const pad = {
+    top: PAD_TOP,
+    bottom: ty.label + 12,
+    left: axisGutter(
+      ticks.map((v) => tickLabel(v, rate.unit)),
+      ty.tickFont,
+    ),
+    right: axisGutter(ticks.map(rightLabel), ty.tickFont),
+  };
+  const plotW = Math.max(0, width - pad.left - pad.right);
+  const height = PLOT_H + pad.top + pad.bottom;
+
   const bars = useMemo(
     () =>
       volume.values.flatMap((v, i): BarDatum[] =>
@@ -66,9 +73,9 @@ export function RateVolumeChart({ name, labels, rate, volume }: Props) {
     [volume.values, rate.values, lo, gridStep, vStep],
   );
   const line = rate.values.map((y, i) => ({ x: i + 1, y }));
-  const barWidth = n > 0 ? Math.max(1, Math.min(14, (plotW - GAP * (n - 1)) / n)) : 1;
-  const xTicks = pickTickValues(labels, plotW, X_TICK_FONT);
-  const tickLabels = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
+  const barWidth = n > 0 ? Math.max(1, Math.min(Math.round(ty.tick * 1.4), (plotW - GAP * (n - 1)) / n)) : 1;
+  const xTicks = pickTickValues(labels, plotW, ty.labelFont, ty.label);
+  const tickLabels = { ...ty.tickFont, fill: t.text.tick, padding: 6 };
 
   const tooltipText = ({ x, rooms, rate: r }: BarDatum): string[] => [
     labels[x - 1] ?? "",
@@ -79,10 +86,10 @@ export function RateVolumeChart({ name, labels, rate, volume }: Props) {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]} numberOfLines={1}>
+        <Text style={[styles.title, { fontSize: ty.title, color: t.text.primary }]} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>
+        <Text style={[styles.note, { fontSize: ty.legend, color: t.text.subtle }]}>
           {`${rate.label} \u00b7 ${volume.label.toLowerCase()}`}
         </Text>
       </View>
@@ -135,7 +142,7 @@ export function RateVolumeChart({ name, labels, rate, volume }: Props) {
                   cornerRadius={0}
                   flyoutPadding={{ top: 4, bottom: 4, left: 8, right: 8 }}
                   flyoutStyle={{ fill: t.bg.panel, stroke: t.border.strong, strokeWidth: 1 }}
-                  style={{ fontFamily: fonts.mono400, fontSize: 10, fill: t.text.primary }}
+                  style={{ ...ty.tickFont, fontSize: ty.legend, fill: t.text.primary }}
                 />
               }
               style={{
@@ -165,7 +172,7 @@ export function RateVolumeChart({ name, labels, rate, volume }: Props) {
                 axis: { stroke: t.border.axis, strokeWidth: 1 },
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
-                tickLabels: { ...X_TICK_FONT, fill: t.text.dim, padding: 6 },
+                tickLabels: { ...ty.labelFont, fill: t.text.dim, padding: 6 },
               }}
             />
           </VictoryChart>
@@ -174,13 +181,13 @@ export function RateVolumeChart({ name, labels, rate, volume }: Props) {
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.lineKey, { backgroundColor: rate.color }]} />
-          <Text style={[styles.legendText, { color: t.text.secondary }]}>
+          <Text style={[styles.legendText, { fontSize: ty.legend, color: t.text.secondary }]}>
             {rate.label} (left axis)
           </Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.barKey, { backgroundColor: t.trend.volume }]} />
-          <Text style={[styles.legendText, { color: t.text.secondary }]}>
+          <Text style={[styles.legendText, { fontSize: ty.legend, color: t.text.secondary }]}>
             {volume.label} (right axis)
           </Text>
         </View>
@@ -198,11 +205,11 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 14,
   },
-  title: { fontFamily: fonts.sans700, fontSize: 13, flexShrink: 1 },
-  note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  title: { fontFamily: fonts.sans700, flexShrink: 1 },
+  note: { fontFamily: fonts.mono400, ...tabular },
   legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 2, marginTop: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
   lineKey: { width: 16, height: 3, borderRadius: 2 },
   barKey: { width: 10, height: 10, borderRadius: 1 },
-  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
+  legendText: { fontFamily: fonts.sans400 },
 });

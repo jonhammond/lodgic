@@ -16,14 +16,12 @@ import { mix } from "../../lib/color";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
-import { NARROW_W } from "./CategoryBarChart";
-import { LABEL_FONT, NARROW, WIDE, wrapLabel } from "./rows";
+import { wrapLabel } from "./rows";
 import { niceDomain, tickLabel } from "./scale";
+import { fitNumericTicks, maxLabelWidth } from "./ticks";
+import { chartType, isCompact, nameLayout } from "./typography";
 
-const BAR_W = 12;
 const GAP = 3;
-const ROW_PAD = 10;
-const VALUE_CHAR_W = 6.2; // mono 10px advance
 // Metric hues (ADR green, CPOR amber) sit at near-identical luminance in light mode, so they
 // separate by hue alone under deuteranopia/protanopia. Each series after the first is pulled
 // towards black by a growing step, adding a lightness difference on top of hue.
@@ -33,6 +31,9 @@ const LIGHTNESS_STEP = 0.22;
 export function GroupedBarChart({ series }: { series: GroupedSeries }) {
   const { t, scheme } = useTheme();
   const [width, setWidth] = useState(0);
+  const ty = chartType(width);
+  const BAR_W = Math.round(ty.tick * 1.2);
+  const ROW_PAD = Math.round(ty.label * 0.9);
   const { labels, unit } = series;
   const fillOf = (i: number) => {
     const base = t.kpi[series.series[i].color].bar;
@@ -45,22 +46,32 @@ export function GroupedBarChart({ series }: { series: GroupedSeries }) {
   const all = series.series.flatMap((s) => s.values);
   const domain = niceDomain(0, Math.max(0, ...all), 4);
   const max = domain.hi;
-  const narrow = width > 0 && width < NARROW_W;
-  const ticks = narrow ? [0, max] : domain.ticks;
-  const layout = narrow ? NARROW : WIDE;
+  const narrow = isCompact(width);
+  const layout = nameLayout(ty);
   const names = labels.map((l) => wrapLabel(l ?? "", layout.chars));
   const wrapped = names.some((s) => s.includes("\n"));
   const groupH = k * (BAR_W + GAP);
-  const rowH = Math.max(groupH + ROW_PAD, wrapped ? 36 : 0);
+  const rowH = Math.max(groupH + ROW_PAD, wrapped ? ty.rowHWrapped : 0);
   const fmt = narrow ? formatByUnit : formatExact;
   const valueW =
-    Math.max(0, ...all.map((v) => fmt(v, unit).length)) * VALUE_CHAR_W + 12;
+    maxLabelWidth(
+      all.map((v) => fmt(v, unit)),
+      ty.tickFont,
+    ) + 12;
   const pad = {
     top: 6,
-    bottom: 22,
+    bottom: ty.tick + 12,
     left: layout.left,
     right: Math.ceil(valueW),
   };
+  const plotW = Math.max(0, width - pad.left - pad.right);
+  const ticks = fitNumericTicks(
+    domain.ticks,
+    (v) => tickLabel(v, unit),
+    plotW,
+    ty.tickFont,
+    ty.tick,
+  );
   const height = n * rowH + pad.top + pad.bottom;
   // Victory draws x=1 at the bottom of a horizontal chart; invert so row 0 is on top.
   // Within a group Victory stacks the first child lowest, so reverse the series to match the legend order.
@@ -71,10 +82,10 @@ export function GroupedBarChart({ series }: { series: GroupedSeries }) {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>
+        <Text style={[styles.title, { color: t.text.primary, fontSize: ty.title }]}>
           {series.title}
         </Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>
+        <Text style={[styles.note, { color: t.text.subtle, fontSize: ty.legend }]}>
           {series.note}
         </Text>
       </View>
@@ -82,7 +93,7 @@ export function GroupedBarChart({ series }: { series: GroupedSeries }) {
         {series.series.map((s, i) => (
           <View key={s.key} style={styles.legendItem}>
             <View style={[styles.legendKey, { backgroundColor: fillOf(i) }]} />
-            <Text style={[styles.legendText, { color: t.text.secondary }]}>
+            <Text style={[styles.legendText, { color: t.text.secondary, fontSize: ty.legend }]}>
               {s.title}
             </Text>
           </View>
@@ -106,7 +117,7 @@ export function GroupedBarChart({ series }: { series: GroupedSeries }) {
                 axis: { stroke: "transparent" },
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
-                tickLabels: { ...LABEL_FONT, fill: t.text.dim, padding: 6 },
+                tickLabels: { ...ty.labelFont, fill: t.text.dim, padding: 6 },
               }}
             />
             <VictoryAxis
@@ -118,8 +129,7 @@ export function GroupedBarChart({ series }: { series: GroupedSeries }) {
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: {
-                  fontFamily: fonts.mono400,
-                  fontSize: 10,
+                  ...ty.tickFont,
                   fill: t.text.tick,
                   padding: 6,
                   textAnchor: ({ index }: { index?: number | string }) =>
@@ -143,8 +153,7 @@ export function GroupedBarChart({ series }: { series: GroupedSeries }) {
                   style={{
                     data: { fill: s.fill, fillOpacity: 1 },
                     labels: {
-                      fontFamily: fonts.mono400,
-                      fontSize: 10,
+                      ...ty.tickFont,
                       fill: t.text.primary,
                     },
                   }}
@@ -166,8 +175,8 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginBottom: 8,
   },
-  title: { fontFamily: fonts.sans700, fontSize: 13 },
-  note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  title: { fontFamily: fonts.sans700 },
+  note: { fontFamily: fonts.mono400, ...tabular },
   legend: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -177,5 +186,5 @@ const styles = StyleSheet.create({
   },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendKey: { width: 10, height: 10, borderRadius: 3 },
-  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
+  legendText: { fontFamily: fonts.sans400 },
 });

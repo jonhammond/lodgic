@@ -14,14 +14,14 @@ import type { StackedSeries } from "../../lib/explicitCharts";
 import { fonts } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
-import { NARROW_W } from "./CategoryBarChart";
-import { BAR_W, LABEL_FONT, NARROW, ROW_H, ROW_H_WRAPPED, WIDE, wrapLabel } from "./rows";
+import { wrapLabel } from "./rows";
 import { niceDomain, tickLabel } from "./scale";
+import { axisGutter, fitNumericTicks } from "./ticks";
+import { chartType, isCompact, nameLayout } from "./typography";
 
 const HORIZONTAL_ABOVE = 6; // more categories than this lay out as rows
 const PLOT_H = 220;
 const MAX_COL_W = 36;
-const X_CHAR_W = 5.6; // sans 10px average advance
 // Light-mode lightness offset as in GroupedBarChart (adjacent hues need more than hue to separate), but
 // bounded: the step shrinks as parts grow so the darkest part stays short of black (mix factor <= MAX).
 const LIGHTNESS_STEP = 0.22;
@@ -35,9 +35,10 @@ type Datum = { x: number; y: number; i: number };
 export function StackedBarChart({ series }: { series: StackedSeries }) {
   const { t, scheme } = useTheme();
   const [width, setWidth] = useState(0);
+  const ty = chartType(width);
   const { labels, parts, unit } = series;
   const n = labels.length;
-  const narrow = width > 0 && width < NARROW_W;
+  const narrow = isCompact(width);
   const horizontal = n > HORIZONTAL_ABOVE || narrow;
   const fillOf = (i: number) => {
     const base = t.kpi[parts[i].color].bar;
@@ -53,26 +54,33 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
   const hiRaw = Math.max(0, ...labels.map((_, i) => parts.reduce((s, p) => s + Math.max(0, p.values[i] ?? 0), 0)));
   const loRaw = Math.min(0, ...labels.map((_, i) => parts.reduce((s, p) => s + Math.min(0, p.values[i] ?? 0), 0)));
   const domain = niceDomain(loRaw, hiRaw, 4);
-  const ticks = horizontal && narrow ? [domain.lo, domain.hi] : domain.ticks;
-  const tickStyle = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
+  const tickStyle = { ...ty.tickFont, fill: t.text.tick, padding: 6 };
 
   // Horizontal: row 0 on top (Victory draws x=1 at the bottom of a horizontal chart).
   const xOf = (i: number) => (horizontal ? n - i : i + 1);
   // VictoryStack's fillData walks each dataset by index against the ascending x set, so data must be
   // ascending in x; descending x silently drops every row after the first.
   const order = labels.map((_, i) => (horizontal ? n - 1 - i : i));
-  const layout = narrow ? NARROW : WIDE;
+  const layout = nameLayout(ty);
   const hNames = labels.map((l) => wrapLabel(l ?? "", layout.chars));
-  const rowH = hNames.some((s) => s.includes("\n")) ? ROW_H_WRAPPED : ROW_H;
+  const rowH = hNames.some((s) => s.includes("\n")) ? ty.rowHWrapped : ty.rowH;
   const pad = horizontal
-    ? { top: 6, bottom: 22, left: layout.left, right: 16 }
-    : { top: 10, bottom: 34, left: 56, right: 12 };
+    ? { top: 6, bottom: ty.tick + 12, left: layout.left, right: 16 }
+    : {
+        top: 10,
+        bottom: 2 * ty.lineH + 10,
+        left: axisGutter(domain.ticks.map((v) => tickLabel(v, unit)), ty.tickFont),
+        right: 12,
+      };
   const plotW = Math.max(0, width - pad.left - pad.right);
+  const ticks = horizontal
+    ? fitNumericTicks(domain.ticks, (v) => tickLabel(v, unit), plotW, ty.tickFont, ty.tick)
+    : domain.ticks;
   const height = horizontal ? n * rowH + pad.top + pad.bottom : PLOT_H + pad.top + pad.bottom;
-  const slotChars = n > 0 ? Math.max(6, Math.min(14, Math.floor(plotW / n / X_CHAR_W))) : 14;
+  const slotChars = n > 0 ? Math.max(6, Math.min(14, Math.floor(plotW / n / ty.sansAdvance) - 1)) : 14;
   const vNames = labels.map((l) => wrapLabel(l ?? "", slotChars));
   const barWidth = horizontal
-    ? BAR_W
+    ? ty.barW
     : Math.max(1, Math.min(MAX_COL_W, (plotW - 8 * (n - 1)) / Math.max(1, n)));
 
   const tooltip = (
@@ -82,20 +90,20 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
       cornerRadius={0}
       flyoutPadding={{ top: 4, bottom: 4, left: 8, right: 8 }}
       flyoutStyle={{ fill: t.bg.panel, stroke: t.border.strong, strokeWidth: 1 }}
-      style={{ fontFamily: fonts.mono400, fontSize: 10, fill: t.text.primary }}
+      style={{ ...ty.tickFont, fill: t.text.primary }}
     />
   );
 
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>{series.title}</Text>
+        <Text style={[styles.title, { color: t.text.primary, fontSize: ty.title }]}>{series.title}</Text>
       </View>
       <View style={styles.legend}>
         {parts.map((p, i) => (
           <View key={p.key} style={styles.legendItem}>
             <View style={[styles.legendKey, { backgroundColor: fillOf(i) }]} />
-            <Text style={[styles.legendText, { color: t.text.secondary }]}>{p.title}</Text>
+            <Text style={[styles.legendText, { color: t.text.secondary, fontSize: ty.legend }]}>{p.title}</Text>
           </View>
         ))}
       </View>
@@ -119,7 +127,7 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
                   : { stroke: t.border.axis, strokeWidth: 1 },
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
-                tickLabels: { ...LABEL_FONT, fill: t.text.dim, padding: 6 },
+                tickLabels: { ...ty.labelFont, fill: t.text.dim, padding: 6 },
               }}
             />
             <VictoryAxis
@@ -169,9 +177,9 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
 const styles = StyleSheet.create({
   card: { paddingTop: 16, paddingHorizontal: 18, paddingBottom: 14 },
   header: { marginBottom: 8 },
-  title: { fontFamily: fonts.sans700, fontSize: 13 },
+  title: { fontFamily: fonts.sans700 },
   legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 12, rowGap: 2, marginBottom: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendKey: { width: 10, height: 10, borderRadius: 3 },
-  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
+  legendText: { fontFamily: fonts.sans400 },
 });

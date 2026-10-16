@@ -14,15 +14,13 @@ import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { monthLabel } from "./format";
 import { niceDomain } from "./scale";
-import { pickTickValues } from "./ticks";
+import { axisGutter, maxLabelWidth, pickTickValues } from "./ticks";
+import { chartType, isCompact } from "./typography";
 
-const PAD = { top: 10, bottom: 22, left: 40, right: 40 };
-const NARROW_W = 360;
+const PAD_TOP = 10;
 const NARROW_RIGHT = 8;
 const PLOT_H = 220;
-const END_LABEL_MIN_GAP = 12;
 const PARTIAL_OPACITY = 0.5;
-const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
 
 type Metric = "csat" | "nps";
 type Scope = "hotel" | "segment" | "portfolio";
@@ -78,10 +76,9 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
 
   const { labels, partialLast } = trend;
   const n = labels.length;
-  const narrow = width > 0 && width < NARROW_W;
-  const pad = { ...PAD, right: narrow ? NARROW_RIGHT : PAD.right };
-  const plotW = Math.max(0, width - pad.left - pad.right);
-  const height = PLOT_H + pad.top + pad.bottom;
+  const ty = chartType(width);
+  const narrow = isCompact(width);
+  const END_LABEL_MIN_GAP = ty.tick * 1.2;
   // Blue CSAT matches the hotel bars in the combo above; amber NPS matches its line.
   const hue: Record<Metric, string> = { csat: t.kpi.revenue.line, nps: t.kpi.cost.line };
 
@@ -105,8 +102,16 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
     return niceDomain(Math.min(0, ...all), Math.max(100, ...all), 5);
   }, [series]);
 
-  const xTicks = pickTickValues(labels.map(guestTrendLabel), plotW, X_TICK_FONT);
-  const tickLabels = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
+  const pad = {
+    top: PAD_TOP,
+    bottom: ty.label + 12,
+    left: axisGutter(yTicks.map(String), ty.tickFont),
+    right: narrow ? NARROW_RIGHT : Math.ceil(maxLabelWidth(["100%"], ty.tickFont) + 16),
+  };
+  const plotW = Math.max(0, width - pad.left - pad.right);
+  const height = PLOT_H + pad.top + pad.bottom;
+  const xTicks = pickTickValues(labels.map(guestTrendLabel), plotW, ty.labelFont, ty.label);
+  const tickLabels = { ...ty.tickFont, fill: t.text.tick, padding: 6 };
 
   // End labels for the hotel lines only; nudged apart when they would collide.
   const ends = useMemo(() => {
@@ -121,7 +126,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
     // Only labels sharing an x can collide.
     if (out.length === 2 && out[0].x === out[1].x) {
       const [a, b] = out[0].y >= out[1].y ? [out[0], out[1]] : [out[1], out[0]];
-      const gap = yPx(b.y, PAD.top, lo, hi) - yPx(a.y, PAD.top, lo, hi);
+      const gap = yPx(b.y, PAD_TOP, lo, hi) - yPx(a.y, PAD_TOP, lo, hi);
       if (gap < END_LABEL_MIN_GAP) {
         const shift = (END_LABEL_MIN_GAP - gap) / 2;
         a.dy = -shift;
@@ -129,7 +134,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
       }
     }
     return out;
-  }, [series, lo, hi]);
+  }, [series, lo, hi, END_LABEL_MIN_GAP]);
 
   const fmt = (s: SeriesDef, v: number) => (s.metric === "csat" ? `${Math.round(v)}%` : String(Math.round(v)));
 
@@ -153,10 +158,10 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]} numberOfLines={1}>
+        <Text style={[styles.title, { fontSize: ty.title, color: t.text.primary }]} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>{note}</Text>
+        <Text style={[styles.note, { fontSize: ty.legend, color: t.text.subtle }]}>{note}</Text>
       </View>
       <View style={styles.legend}>
         {series.map((s) => (
@@ -170,7 +175,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
                 borderStyle: scopeStyle(s.scope).border,
               }}
             />
-            <Text style={[styles.legendText, { color: t.text.secondary }]}>{s.legend}</Text>
+            <Text style={[styles.legendText, { fontSize: ty.legend, color: t.text.secondary }]}>{s.legend}</Text>
           </View>
         ))}
       </View>
@@ -219,7 +224,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: {
-                  ...X_TICK_FONT,
+                  ...ty.labelFont,
                   fill: t.text.dim,
                   padding: 6,
                   textAnchor: ({ index }: { index?: number | string }) =>
@@ -278,8 +283,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
                     dx={narrow ? -4 : 8}
                     dy={narrow ? -10 + e.dy : e.dy}
                     style={{
-                      fontFamily: fonts.mono400,
-                      fontSize: 10,
+                      ...ty.tickFont,
                       fill: t.text.primary,
                       stroke: t.bg.card,
                       strokeWidth: 3,
@@ -329,7 +333,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
               { left: tipLeft, top: pad.top, backgroundColor: t.bg.panel, borderColor: t.border.strong },
             ]}
           >
-            <Text style={[styles.tipHead, { color: t.text.subtle }]}>
+            <Text style={[styles.tipHead, { fontSize: ty.legend, color: t.text.subtle }]}>
               {guestTrendLabel(labels[hoverIdx - 1] ?? "")}
               {partialLast && hoverIdx === n ? " (partial)" : ""}
             </Text>
@@ -338,10 +342,10 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
               return (
                 <View key={s.key} style={styles.tipRow}>
                   <View style={[styles.tipKey, { backgroundColor: hue[s.metric], height: Math.ceil(scopeStyle(s.scope).width) }]} />
-                  <Text style={[styles.tipName, { color: t.text.secondary }]} numberOfLines={1}>
+                  <Text style={[styles.tipName, { fontSize: ty.legend, color: t.text.secondary }]} numberOfLines={1}>
                     {s.tip}
                   </Text>
-                  <Text style={[styles.tipVal, { color: t.text.primary }]}>{v == null ? "-" : fmt(s, v)}</Text>
+                  <Text style={[styles.tipVal, { fontSize: ty.legend, color: t.text.primary }]}>{v == null ? "-" : fmt(s, v)}</Text>
                 </View>
               );
             })}
@@ -363,11 +367,11 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 10,
   },
-  title: { fontFamily: fonts.sans700, fontSize: 13, flexShrink: 1 },
-  note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  title: { fontFamily: fonts.sans700, flexShrink: 1 },
+  note: { fontFamily: fonts.mono400, ...tabular },
   legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 2, marginBottom: 8 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
-  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
+  legendText: { fontFamily: fonts.sans400 },
   tip: {
     position: "absolute",
     borderWidth: 1,
@@ -376,9 +380,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     gap: 2,
   },
-  tipHead: { fontFamily: fonts.sans400, fontSize: 11, marginBottom: 2 },
+  tipHead: { fontFamily: fonts.sans400, marginBottom: 2 },
   tipRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   tipKey: { width: 10, height: 2 },
-  tipName: { fontFamily: fonts.sans400, fontSize: 11, flexShrink: 1 },
-  tipVal: { fontFamily: fonts.mono400, fontSize: 11, marginLeft: "auto", paddingLeft: 10, ...tabular },
+  tipName: { fontFamily: fonts.sans400, flexShrink: 1 },
+  tipVal: { fontFamily: fonts.mono400, marginLeft: "auto", paddingLeft: 10, ...tabular },
 });

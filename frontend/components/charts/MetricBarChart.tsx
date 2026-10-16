@@ -1,39 +1,39 @@
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import {
-  VictoryAxis,
-  VictoryBar,
-  VictoryChart,
-  VictoryTooltip,
-  VictoryVoronoiContainer,
-} from "victory";
+import { VictoryAxis, VictoryBar, VictoryChart, VictoryTooltip, VictoryVoronoiContainer } from "victory";
 import { formatByUnit, MetricSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { niceCeil, tickLabel } from "./scale";
-import { pickTickValues } from "./ticks";
+import { axisGutter, pickTickValues } from "./ticks";
+import { chartType } from "./typography";
 
 const PLOT_H = 140;
-const PAD = { top: 6, bottom: 22, left: 48, right: 0 };
-
-const HEIGHT = PLOT_H + PAD.top + PAD.bottom;
+const PAD_TOP = 6;
 const GAP = 5;
-const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
 
 export function MetricBarChart({ series }: { series: MetricSeries }) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
+  const ty = chartType(width);
   const { values, labels, color, partialLast, projection, unit } = series;
   const n = values.length;
   const max = niceCeil(Math.max(0, ...values, projection ?? 0));
-  const plotW = Math.max(0, width - PAD.left - PAD.right);
+  const pad = {
+    top: PAD_TOP,
+    bottom: ty.label + 12,
+    left: axisGutter([tickLabel(0, unit), tickLabel(max / 2, unit), tickLabel(max, unit)], ty.tickFont),
+    right: 0,
+  };
+  const height = PLOT_H + pad.top + pad.bottom;
+  const plotW = Math.max(0, width - pad.left - pad.right);
   const barWidth = n > 0 ? Math.max(1, (plotW - GAP * (n - 1)) / n) : 1;
   const barColors = t.kpi[color];
-  const xTicks = pickTickValues(labels, plotW, X_TICK_FONT);
+  const xTicks = pickTickValues(labels, plotW, ty.labelFont, ty.label);
   const tickLabels = {
     fontFamily: fonts.mono400,
-    fontSize: 10,
+    fontSize: ty.tick,
     fill: t.text.tick,
     padding: 6,
   };
@@ -46,20 +46,18 @@ export function MetricBarChart({ series }: { series: MetricSeries }) {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>{series.title}</Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>{series.note}</Text>
+        <Text style={[styles.title, { color: t.text.primary, fontSize: ty.title }]}>{series.title}</Text>
+        <Text style={[styles.note, { color: t.text.subtle, fontSize: ty.legend }]}>{series.note}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 && n > 0 && (
           <VictoryChart
             width={width}
-            height={HEIGHT}
-            padding={PAD}
+            height={height}
+            padding={pad}
             domain={{ x: [0.5, n + 0.5], y: [0, max] }}
             domainPadding={0}
-            containerComponent={
-              <VictoryVoronoiContainer voronoiDimension="x" voronoiBlacklist={["projection"]} />
-            }
+            containerComponent={<VictoryVoronoiContainer voronoiDimension="x" voronoiBlacklist={["projection"]} />}
           >
             <VictoryAxis
               dependentAxis
@@ -83,8 +81,16 @@ export function MetricBarChart({ series }: { series: MetricSeries }) {
                   pointerLength={4}
                   cornerRadius={0}
                   flyoutPadding={{ top: 4, bottom: 4, left: 8, right: 8 }}
-                  flyoutStyle={{ fill: t.bg.panel, stroke: t.border.strong, strokeWidth: 1 }}
-                  style={{ fontFamily: fonts.mono400, fontSize: 10, fill: t.text.primary }}
+                  flyoutStyle={{
+                    fill: t.bg.panel,
+                    stroke: t.border.strong,
+                    strokeWidth: 1,
+                  }}
+                  style={{
+                    fontFamily: fonts.mono400,
+                    fontSize: ty.legend,
+                    fill: t.text.primary,
+                  }}
                 />
               }
               style={{
@@ -122,11 +128,11 @@ export function MetricBarChart({ series }: { series: MetricSeries }) {
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: {
-                  ...X_TICK_FONT,
+                  ...ty.labelFont,
                   fill: t.text.dim,
                   padding: 6,
                   // Keep the edge labels inside the plot: the last bar sits flush
-                  // against the right edge (PAD.right = 0), so anchor its label there.
+                  // against the right edge (pad.right = 0), so anchor its label there.
                   textAnchor: ({ index }: { index?: number | string }) =>
                     Number(index) === xTicks.length - 1
                       ? "end"
@@ -151,6 +157,6 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginBottom: 14,
   },
-  title: { fontFamily: fonts.sans700, fontSize: 13 },
-  note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  title: { fontFamily: fonts.sans700 },
+  note: { fontFamily: fonts.mono400, ...tabular },
 });

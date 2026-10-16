@@ -15,10 +15,9 @@ import { fonts } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { niceDomain, tickLabel } from "./scale";
+import { axisGutter, fitNumericTicks } from "./ticks";
+import { chartType, isCompact } from "./typography";
 
-const PAD = { top: 14, bottom: 54, left: 72, right: 22 };
-const PAD_NARROW = { ...PAD, left: 62, right: 14 };
-const NARROW_W = 360;
 const LABEL_MIN_W = 480;
 const LABEL_MAX_POINTS = 10;
 const DOMAIN_PAD = 10;
@@ -41,17 +40,26 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
   const [width, setWidth] = useState(0);
   const { points, xUnit, yUnit } = series;
   const n = points.length;
-  const narrow = width > 0 && width < NARROW_W;
-  const pad = narrow ? PAD_NARROW : PAD;
+  const ty = chartType(width);
   const height = Math.round(Math.min(360, Math.max(240, width * 0.6)));
   const xd = niceDomain(Math.min(...points.map((p) => p.x)), Math.max(...points.map((p) => p.x)), 4);
   const yd = niceDomain(Math.min(...points.map((p) => p.y)), Math.max(...points.map((p) => p.y)), 4);
+  const pad = {
+    top: 14,
+    bottom: ty.tick + ty.legend + 28,
+    left: axisGutter(
+      yd.ticks.map((v) => tickLabel(v, yUnit)),
+      ty.tickFont,
+    ) + ty.legend + 10,
+    right: isCompact(width) ? 14 : 22,
+  };
   const data: Datum[] = points.map((p) => ({ x: p.x, y: p.y, name: p.label, quadrant: p.quadrant, fill: t.quadrant[p.quadrant] }));
   const named = n <= LABEL_MAX_POINTS && width >= LABEL_MIN_W;
   const xSpan = xd.hi - xd.lo || 1;
   const ySpan = yd.hi - yd.lo || 1;
   const plotW = Math.max(1, width - pad.left - pad.right);
   const plotH = Math.max(1, height - pad.top - pad.bottom);
+  const xTicks = fitNumericTicks(xd.ticks, (v) => tickLabel(v, xUnit), plotW, ty.tickFont, ty.tick);
   if (named) {
     // Placement is stored on the datum because Victory clones data objects.
     const placed = placeLabels(
@@ -62,6 +70,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
       })),
       plotW,
       plotH,
+      { charW: ty.sansAdvance, labelH: ty.lineH },
     );
     placed.forEach((pl, i) => {
       if (pl) Object.assign(data[i], { dx: pl.dx, dy: pl.dy, anchor: pl.anchor });
@@ -74,13 +83,13 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
     { key: "pricey", text: `High ${series.xLabel}, low ${series.yLabel}` },
     { key: "busy", text: `Low ${series.xLabel}, high ${series.yLabel}` },
   ] as const;
-  const tick = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
-  const axisLabel = { fontFamily: fonts.sans400, fontSize: 11, fill: t.text.dim };
+  const tick = { ...ty.tickFont, fill: t.text.tick, padding: 6 };
+  const axisLabel = { ...ty.labelFont, fontSize: ty.legend, fill: t.text.dim };
 
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>{series.title}</Text>
+        <Text style={[styles.title, { fontSize: ty.title, color: t.text.primary }]}>{series.title}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 && n > 0 && (
@@ -93,7 +102,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
             containerComponent={<VictoryVoronoiContainer voronoiBlacklist={["names"]} />}
           >
             <VictoryAxis
-              tickValues={narrow ? [xd.lo, xd.hi] : xd.ticks}
+              tickValues={xTicks}
               tickFormat={(v: number) => tickLabel(v, xUnit)}
               label={series.xTitle}
               axisLabelComponent={<VictoryLabel dy={8} />}
@@ -102,7 +111,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: tick,
-                axisLabel: { ...axisLabel, padding: 34 },
+                axisLabel: { ...axisLabel, padding: ty.tick + 22 },
               }}
             />
             <VictoryAxis
@@ -135,7 +144,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
                   cornerRadius={0}
                   flyoutPadding={{ top: 4, bottom: 4, left: 8, right: 8 }}
                   flyoutStyle={{ fill: t.bg.panel, stroke: t.border.strong, strokeWidth: 1 }}
-                  style={{ fontFamily: fonts.mono400, fontSize: 10, fill: t.text.primary }}
+                  style={{ ...ty.tickFont, fontSize: ty.legend, fill: t.text.primary }}
                 />
               }
               style={{
@@ -155,13 +164,13 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
                 labelComponent={
                   <VictoryLabel
                     dx={({ datum }: { datum?: Datum }) => datum?.dx ?? 0}
-                    dy={({ datum }: { datum?: Datum }) => datum?.dy ?? -12}
+                    dy={({ datum }: { datum?: Datum }) => datum?.dy ?? -ty.lineH}
                     textAnchor={({ datum }: { datum?: Datum }) => datum?.anchor ?? "middle"}
                   />
                 }
                 style={{
                   data: { fill: "transparent" },
-                  labels: { fontFamily: fonts.sans400, fontSize: 10, fill: t.text.dim },
+                  labels: { ...ty.labelFont, fill: t.text.dim },
                 }}
               />
             )}
@@ -172,7 +181,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
         {legendItems.map((it) => (
           <View key={it.key} style={styles.legendItem}>
             <View style={[styles.key, { backgroundColor: t.quadrant[it.key] }]} />
-            <Text style={[styles.legendText, { color: t.text.secondary }]}>{it.text}</Text>
+            <Text style={[styles.legendText, { fontSize: ty.legend, color: t.text.secondary }]}>{it.text}</Text>
           </View>
         ))}
       </View>
@@ -188,9 +197,9 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginBottom: 10,
   },
-  title: { fontFamily: fonts.sans700, fontSize: 13, flexShrink: 1 },
+  title: { fontFamily: fonts.sans700, flexShrink: 1 },
   legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 2, marginTop: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
   key: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
+  legendText: { fontFamily: fonts.sans400 },
 });

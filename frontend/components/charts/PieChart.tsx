@@ -8,6 +8,7 @@ import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { formatPercent } from "./format";
+import { chartType } from "./typography";
 
 const SIDE_BY_SIDE_W = 480;
 const DONUT_MAX = 220;
@@ -18,6 +19,7 @@ const DARK_SPREAD = { deepen: 0.6, fade: 0.65 };
 export function PieChart({ series }: { series: PieSeries }) {
   const { t, scheme } = useTheme();
   const [width, setWidth] = useState(0);
+  const ty = chartType(width);
   const { slices, unit } = series;
   const n = slices.length;
   // Slices arrive sorted largest-first (trailing "Other"): deepest shade on the largest.
@@ -29,7 +31,7 @@ export function PieChart({ series }: { series: PieSeries }) {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>{series.title}</Text>
+        <Text style={[styles.title, { fontSize: ty.title, color: t.text.primary }]}>{series.title}</Text>
       </View>
       <View
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
@@ -56,14 +58,14 @@ export function PieChart({ series }: { series: PieSeries }) {
               {slices.map((s, i) => (
                 <View key={`${i}-${s.label}`} style={styles.row}>
                   <View style={[styles.key, { backgroundColor: ramp[i] }]} />
-                  <Text style={[styles.name, { color: t.text.secondary }]} numberOfLines={2}>
+                  <Text style={[styles.name, { fontSize: ty.legend, color: t.text.secondary }]} numberOfLines={2}>
                     {s.label}
                   </Text>
-                  <Text style={[styles.value, { color: t.text.primary }]}>
+                  <Text style={[styles.value, { fontSize: ty.legend, color: t.text.primary }]}>
                     {formatByUnit(s.value, unit)}
                   </Text>
                   {unit !== "percent" && (
-                    <Text style={[styles.pct, { color: t.text.subtle }]}>{formatPercent(s.pct)}</Text>
+                    <Text style={[styles.pct, { fontSize: ty.legend, width: Math.ceil(6 * ty.monoAdvance) + 8, color: t.text.subtle }]}>{formatPercent(s.pct)}</Text>
                   )}
                 </View>
               ))}
@@ -78,14 +80,14 @@ export function PieChart({ series }: { series: PieSeries }) {
 const styles = StyleSheet.create({
   card: { paddingTop: 16, paddingHorizontal: 18, paddingBottom: 14 },
   header: { marginBottom: 10 },
-  title: { fontFamily: fonts.sans700, fontSize: 13 },
+  title: { fontFamily: fonts.sans700 },
   body: { alignItems: "center", gap: 12 },
   bodyWide: { flexDirection: "row", gap: 20, justifyContent: "center" },
   legend: { alignSelf: "stretch", gap: 4 },
   legendWide: { flex: 1, maxWidth: LEGEND_MAX_W, alignSelf: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   key: { width: 10, height: 10, borderRadius: 2 },
-  name: { fontFamily: fonts.sans400, fontSize: 11, flex: 1 },
-  value: { fontFamily: fonts.mono400, fontSize: 11, ...tabular, textAlign: "right" },
-  pct: { fontFamily: fonts.mono400, fontSize: 11, ...tabular, width: 48, textAlign: "right" },
+  name: { fontFamily: fonts.sans400, flex: 1 },
+  value: { fontFamily: fonts.mono400, ...tabular, textAlign: "right" },
+  pct: { fontFamily: fonts.mono400, ...tabular, textAlign: "right" },
 });

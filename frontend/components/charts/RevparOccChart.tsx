@@ -17,6 +17,8 @@ import { Card } from "../Card";
 import { formatCurrency, formatPercent } from "./format";
 import { truncateLabel, wrapLabel } from "./rows";
 import { axisScale, tickLabel } from "./scale";
+import { axisGutter } from "./ticks";
+import { chartType, isCompact } from "./typography";
 
 export type RevparOccChartProps = {
   /** Already sorted; first row leftmost. */
@@ -25,15 +27,11 @@ export type RevparOccChartProps = {
   target: number;
 };
 
-const PAD = { top: 10, bottom: 34, left: 58, right: 58 };
-const NARROW_PAD = { left: 64, right: 48, bottom: 88 };
-const NARROW_W = 360;
+const PAD_TOP = 10;
 const NARROW_TICK_ANGLE = -60;
 const NARROW_LABEL_CHARS = 16; // single rotated line, ellipsised beyond this
 const MAX_LABEL_LINES = 3;
-const LINE_H = 12;
 const MAX_LABEL_CHARS = 14;
-const X_CHAR_W = 5.6; // sans 10px average advance
 const PLOT_H = 220;
 const GAP = 8;
 const MAX_BAR_W = 28;
@@ -46,36 +44,58 @@ const TIER_TEXT: Record<PropertyCalc["tier"], string> = {
   critical: "Critical (<85% of target)",
 };
 
-type BarDatum = { x: number; y: number; y0: number; i: number; tier: PropertyCalc["tier"] };
+type BarDatum = {
+  x: number;
+  y: number;
+  y0: number;
+  i: number;
+  tier: PropertyCalc["tier"];
+};
 
 /** RevPAR bars on the left $ axis, occupancy line on a fixed 0-100 % right axis, one shared 0..100 grid. */
 export function RevparOccChart({ rows, target }: RevparOccChartProps) {
   const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const n = rows.length;
-  const narrow = width > 0 && width < NARROW_W;
-  const basePad = narrow ? { ...PAD, ...NARROW_PAD } : PAD;
-  const plotW = Math.max(0, width - basePad.left - basePad.right);
+  const ty = chartType(width);
+  const narrow = isCompact(width);
   // Blue keeps the occupancy line distinct from the green / amber / red bar tiers in both themes.
   const lineColor = t.quadrant.busy;
 
   const revValues = [target, ...rows.map((r) => r.revpar)];
-  const { scale: bs, intervals } = INTERVAL_OPTIONS.map((k) => ({ scale: axisScale(revValues, k), intervals: k }))
-    .reduce((best, cur) => (cur.scale.hi < best.scale.hi ? cur : best));
+  const { scale: bs, intervals } = INTERVAL_OPTIONS.map((k) => ({
+    scale: axisScale(revValues, k),
+    intervals: k,
+  })).reduce((best, cur) => (cur.scale.hi < best.scale.hi ? cur : best));
   const ticks = Array.from({ length: intervals + 1 }, (_, i) => (i * 100) / intervals);
   const norm = (v: number) => ((v - bs.lo) / (bs.hi - bs.lo)) * 100;
   const denorm = (y: number) => bs.lo + (y / 100) * (bs.hi - bs.lo);
+  const gutterL = axisGutter(
+    ticks.map((v) => tickLabel(denorm(v), "currency")),
+    ty.tickFont,
+  );
+  const gutterR = axisGutter(
+    ticks.map((v) => `${Math.round(v)}%`),
+    ty.tickFont,
+  );
+  const plotW = Math.max(0, width - gutterL - gutterR);
 
   // y0 anchors bars at the zero line; without it Victory draws them from the plot floor.
   const zeroY = norm(0);
-  const bars: BarDatum[] = rows.map((r, i) => ({ x: i + 1, y: norm(r.revpar), y0: zeroY, i, tier: r.tier }));
+  const bars: BarDatum[] = rows.map((r, i) => ({
+    x: i + 1,
+    y: norm(r.revpar),
+    y0: zeroY,
+    i,
+    tier: r.tier,
+  }));
   const dots = rows.map((r, i) => ({ x: i + 1, y: r.occupancy * 100 }));
   const targetData = [
     { x: 0.5, y: norm(target) },
     { x: n + 0.5, y: norm(target) },
   ];
   const barWidth = n > 0 ? Math.max(1, Math.min(MAX_BAR_W, (plotW - GAP * (n - 1)) / n)) : 1;
-  const slotChars = n > 0 ? Math.floor(plotW / n / X_CHAR_W) : MAX_LABEL_CHARS;
+  const slotChars = n > 0 ? Math.floor(plotW / n / ty.sansAdvance) - 1 : MAX_LABEL_CHARS;
   // Narrow: one steeply rotated line per label (wrapped multi-line labels pile up at ~20px pitch).
   const names = rows.map((r) =>
     narrow
@@ -83,15 +103,36 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
       : wrapLabel(r.name, Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars)), MAX_LABEL_LINES),
   );
   const lines = Math.max(1, ...names.map((s) => s.split("\n").length));
-  const pad = { ...basePad, bottom: basePad.bottom + (lines - 1) * LINE_H };
+  // Compact: rotated single line needs its vertical extent; else category lines + axis padding.
+  const bottom = narrow
+    ? Math.ceil(NARROW_LABEL_CHARS * ty.sansAdvance * Math.sin((-NARROW_TICK_ANGLE * Math.PI) / 180)) + 10
+    : ty.label + 24 + (lines - 1) * ty.lineH;
+  const pad = { top: PAD_TOP, bottom, left: gutterL, right: gutterR };
   const height = PLOT_H + pad.top + pad.bottom;
-  const tickLabels = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
+  const tickLabels = {
+    fontFamily: fonts.mono400,
+    fontSize: ty.tick,
+    fill: t.text.tick,
+    padding: 6,
+  };
 
-  const legend: { color: string; text: string; kind: "swatch" | "dash" | "line" }[] = [
+  const legend: {
+    color: string;
+    text: string;
+    kind: "swatch" | "dash" | "line";
+  }[] = [
     { color: t.tier.above, text: "RevPAR above target", kind: "swatch" },
     { color: t.tier.below, text: "RevPAR below target", kind: "swatch" },
-    { color: t.tier.critical, text: "RevPAR critical (<85% of target)", kind: "swatch" },
-    { color: t.text.secondary, text: `Portfolio target ${formatCurrency(target)}`, kind: "dash" },
+    {
+      color: t.tier.critical,
+      text: "RevPAR critical (<85% of target)",
+      kind: "swatch",
+    },
+    {
+      color: t.text.secondary,
+      text: `Portfolio target ${formatCurrency(target)}`,
+      kind: "dash",
+    },
     { color: lineColor, text: "Occupancy (right axis)", kind: "line" },
   ];
 
@@ -118,7 +159,11 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
               tickFormat={(v: number) => tickLabel(denorm(v), "currency")}
               style={{
                 axis: { stroke: "transparent" },
-                grid: { stroke: t.border.axis, strokeWidth: 1, strokeDasharray: "none" },
+                grid: {
+                  stroke: t.border.axis,
+                  strokeWidth: 1,
+                  strokeDasharray: "none",
+                },
                 ticks: { stroke: "transparent" },
                 tickLabels: { ...tickLabels, textAnchor: "end" },
               }}
@@ -158,8 +203,16 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
                   pointerLength={4}
                   cornerRadius={0}
                   flyoutPadding={{ top: 4, bottom: 4, left: 8, right: 8 }}
-                  flyoutStyle={{ fill: t.bg.panel, stroke: t.border.strong, strokeWidth: 1 }}
-                  style={{ fontFamily: fonts.mono400, fontSize: 10, fill: t.text.primary }}
+                  flyoutStyle={{
+                    fill: t.bg.panel,
+                    stroke: t.border.strong,
+                    strokeWidth: 1,
+                  }}
+                  style={{
+                    fontFamily: fonts.mono400,
+                    fontSize: ty.legend,
+                    fill: t.text.primary,
+                  }}
                 />
               }
               style={{
@@ -172,7 +225,13 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
             <VictoryLine
               name="target"
               data={targetData}
-              style={{ data: { stroke: t.text.primary, strokeWidth: 1, strokeDasharray: "4,3" } }}
+              style={{
+                data: {
+                  stroke: t.text.primary,
+                  strokeWidth: 1,
+                  strokeDasharray: "4,3",
+                },
+              }}
             />
             {/* Card-colour halo keeps the line readable where it crosses bars of similar brightness. */}
             <VictoryLine
@@ -180,7 +239,12 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
               interpolation="linear"
               data={dots}
               style={{
-                data: { stroke: t.bg.card, strokeWidth: 5.5, strokeLinejoin: "round", strokeLinecap: "round" },
+                data: {
+                  stroke: t.bg.card,
+                  strokeWidth: 5.5,
+                  strokeLinejoin: "round",
+                  strokeLinecap: "round",
+                },
               }}
             />
             <VictoryLine
@@ -188,14 +252,21 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
               interpolation="linear"
               data={dots}
               style={{
-                data: { stroke: lineColor, strokeWidth: 2.5, strokeLinejoin: "round", strokeLinecap: "round" },
+                data: {
+                  stroke: lineColor,
+                  strokeWidth: 2.5,
+                  strokeLinejoin: "round",
+                  strokeLinecap: "round",
+                },
               }}
             />
             <VictoryScatter
               name="dots"
               data={dots}
               size={3.5}
-              style={{ data: { fill: lineColor, stroke: t.bg.card, strokeWidth: 1.5 } }}
+              style={{
+                data: { fill: lineColor, stroke: t.bg.card, strokeWidth: 1.5 },
+              }}
             />
             <VictoryAxis
               tickValues={rows.map((_, i) => i + 1)}
@@ -211,7 +282,12 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
                 axis: { stroke: t.border.axis, strokeWidth: 1 },
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
-                tickLabels: { fontFamily: fonts.sans400, fontSize: 10, fill: t.text.dim, padding: 6 },
+                tickLabels: {
+                  fontFamily: fonts.sans400,
+                  fontSize: ty.label,
+                  fill: t.text.dim,
+                  padding: 6,
+                },
               }}
             />
           </VictoryChart>
@@ -229,7 +305,7 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
                     : [styles.swatch, { backgroundColor: l.color }]
               }
             />
-            <Text style={[styles.legendText, { color: t.text.secondary }]}>{l.text}</Text>
+            <Text style={[styles.legendText, { color: t.text.secondary, fontSize: ty.legend }]}>{l.text}</Text>
           </View>
         ))}
       </View>
@@ -239,10 +315,21 @@ export function RevparOccChart({ rows, target }: RevparOccChartProps) {
 
 const styles = StyleSheet.create({
   card: { paddingTop: 16, paddingHorizontal: 18, paddingBottom: 14 },
-  legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 16, rowGap: 2, marginTop: 10 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 16,
+    rowGap: 2,
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 3,
+  },
   swatch: { width: 10, height: 10, borderRadius: 2 },
   lineKey: { width: 16, height: 3, borderRadius: 2 },
   dash: { width: 14, height: 0, borderTopWidth: 2, borderStyle: "dashed" },
-  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
+  legendText: { fontFamily: fonts.sans400 },
 });

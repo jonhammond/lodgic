@@ -6,34 +6,36 @@ import { formatByUnit, formatExact, isAdditiveKey, MetricSeries } from "../../li
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
-import { BAR_W, LABEL_FONT, NARROW, ROW_H, ROW_H_WRAPPED, VALUE_CHAR_W, WIDE, wrapLabel } from "./rows";
+import { wrapLabel } from "./rows";
 import { niceDomain, tickLabel } from "./scale";
-
-export const NARROW_W = 360;
+import { fitNumericTicks, maxLabelWidth } from "./ticks";
+import { chartType, isCompact, nameLayout } from "./typography";
 
 export function CategoryBarChart({ series }: { series: MetricSeries }) {
   const { t, scheme } = useTheme();
   const [width, setWidth] = useState(0);
+  const ty = chartType(width);
   const { values, labels, color, unit } = series;
   const n = values.length;
   // Hug the data: the longest bar reaches ~the last tick instead of a coarse 1/2/5 ceiling.
   const domain = niceDomain(0, Math.max(0, ...values), 4);
   const max = domain.hi;
-  // Narrow tracks only have room for the end-point ticks.
-  const narrow = width > 0 && width < NARROW_W;
-  const ticks = narrow ? [0, max] : domain.ticks;
-  const layout = narrow ? NARROW : WIDE;
+  const narrow = isCompact(width);
+  const layout = nameLayout(ty);
   const names = labels.map((l) => wrapLabel(l ?? "", layout.chars));
   const wrapped = names.some((s) => s.includes("\n"));
-  const rowH = wrapped ? ROW_H_WRAPPED : ROW_H;
+  const rowH = wrapped ? ty.rowHWrapped : ty.rowH;
   // Wide layouts stand in for the table: exact values. Narrow keeps compact labels so the track stays usable.
   const fmt = narrow ? formatByUnit : formatExact;
   const valueText = values.map((v) => fmt(v, unit));
   const total = isAdditiveKey(series.key) ? values.reduce((a, b) => a + b, 0) : null;
   const note = total === null ? series.note : `Total ${formatExact(total, unit)} \u00b7 ${series.note}`;
   // Reserve the right gutter for the widest value label so the longest bar never runs under it.
-  const valueW = Math.max(0, ...valueText.map((s) => s.length)) * VALUE_CHAR_W + 12;
-  const pad = { top: 6, bottom: 22, left: layout.left, right: Math.ceil(valueW) };
+  const valueW = maxLabelWidth(valueText, ty.tickFont) + 12;
+  const pad = { top: 6, bottom: ty.tick + 12, left: layout.left, right: Math.ceil(valueW) };
+  const plotW = Math.max(0, width - pad.left - pad.right);
+  // Thin ticks by measured width so labels never collide.
+  const ticks = fitNumericTicks(domain.ticks, (v) => tickLabel(v, unit), plotW, ty.tickFont, ty.tick);
   const height = n * rowH + pad.top + pad.bottom;
   const hue = t.kpi[color].bar;
   // Ranked single-hue ramp: deepest shade for the largest value, ties share a shade. Shade follows magnitude,
@@ -46,8 +48,8 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>{series.title}</Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>{note}</Text>
+        <Text style={[styles.title, { color: t.text.primary, fontSize: ty.title }]}>{series.title}</Text>
+        <Text style={[styles.note, { color: t.text.subtle, fontSize: ty.legend }]}>{note}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 && n > 0 && (
@@ -67,7 +69,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
                 axis: { stroke: "transparent" },
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
-                tickLabels: { ...LABEL_FONT, fill: t.text.dim, padding: 6 },
+                tickLabels: { ...ty.labelFont, fill: t.text.dim, padding: 6 },
               }}
             />
             <VictoryAxis
@@ -79,8 +81,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: {
-                  fontFamily: fonts.mono400,
-                  fontSize: 10,
+                  ...ty.tickFont,
                   fill: t.text.tick,
                   padding: 6,
                   textAnchor: ({ index }: { index?: number | string }) =>
@@ -90,7 +91,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
             />
             <VictoryBar
               data={data}
-              barWidth={BAR_W}
+              barWidth={ty.barW}
               cornerRadius={{ top: 2 }}
               labels={({ datum }) => fmt(datum.y, unit)}
               labelComponent={<VictoryLabel dx={4} textAnchor="start" />}
@@ -99,8 +100,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
                   fill: ({ datum }: { datum?: { fill?: string } }) => datum?.fill ?? hue,
                 },
                 labels: {
-                  fontFamily: fonts.mono400,
-                  fontSize: 10,
+                  ...ty.tickFont,
                   fill: t.text.primary,
                 },
               }}
@@ -120,6 +120,6 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginBottom: 14,
   },
-  title: { fontFamily: fonts.sans700, fontSize: 13 },
-  note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  title: { fontFamily: fonts.sans700 },
+  note: { fontFamily: fonts.mono400, ...tabular },
 });

@@ -1,3 +1,4 @@
+import { fitTicksByWidth } from "../../lib/fitTicks.ts";
 import { TextSize } from "victory";
 
 // Preferred strides so daily series thin to calendar-ish cadences (weekly, fortnightly)
@@ -30,4 +31,25 @@ export function pickTickValues(
   const out: number[] = [];
   for (let i = n; i >= 1; i -= stride) out.push(i);
   return out.reverse();
+}
+
+export function maxLabelWidth(labels: string[], font: TickFont): number {
+  return labels.reduce((m, l) => Math.max(m, TextSize.approximateTextSize(l, font).width), 0);
+}
+
+export function axisGutter(labels: string[], font: TickFont, pad = 12): number {
+  return Math.ceil(maxLabelWidth(labels, font) + pad);
+}
+
+/** Thins numeric ticks on a horizontal axis so measured labels do not collide; keeps first and last. */
+export function fitNumericTicks(
+  ticks: number[],
+  format: (v: number) => string,
+  plotW: number,
+  font: TickFont,
+  gap = 12,
+): number[] {
+  if (ticks.length < 3 || plotW <= 0) return ticks;
+  const widths = ticks.map((t) => TextSize.approximateTextSize(format(t), font).width);
+  return fitTicksByWidth(ticks, widths, plotW, gap).map((i) => ticks[i]);
 }

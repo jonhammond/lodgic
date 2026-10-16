@@ -15,13 +15,11 @@ import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { trendColor } from "./format";
 import { niceDomain, tickLabel } from "./scale";
-import { pickTickValues } from "./ticks";
+import { axisGutter, maxLabelWidth, pickTickValues } from "./ticks";
+import { chartType, isCompact } from "./typography";
 
-const PAD = { top: 10, bottom: 22, left: 40, right: 52 };
-const NARROW_W = 360;
+const PAD_TOP = 10;
 const NARROW_RIGHT = 8;
-const END_LABEL_MIN_GAP = 12;
-const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
 
 type SeriesItem = TrendSeries["series"][number];
 const HIT_PX = 14;
@@ -55,13 +53,11 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
 
   const { labels, unit, reference } = series;
   const n = labels.length;
-  const narrow = width > 0 && width < NARROW_W;
-  const padRight = narrow ? NARROW_RIGHT : PAD.right;
-  const pad = { ...PAD, right: padRight };
-  const plotW = Math.max(0, width - PAD.left - padRight);
+  const ty = chartType(width);
+  const narrow = isCompact(width);
   const multi = series.series.length >= 2;
   const plotH = multi ? 280 : 180;
-  const height = plotH + PAD.top + PAD.bottom;
+  const END_LABEL_MIN_GAP = ty.tick * 1.2;
 
   const colorOf = (s: SeriesItem): string => trendColor(t, s, multi);
 
@@ -72,20 +68,32 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
     return niceDomain(Math.min(...all), Math.max(...all), multi ? 6 : 4);
   }, [series, reference, multi]);
 
+  const endText = series.series.map((s) => {
+    const v = [...s.values].reverse().find((x) => x !== null);
+    return v == null ? "" : formatByUnit(v, unit);
+  });
+  const padLeft = axisGutter(
+    yTicks.map((v) => tickLabel(v, unit)),
+    ty.tickFont,
+  );
+  const padRight = narrow ? NARROW_RIGHT : Math.ceil(maxLabelWidth(endText, ty.tickFont) + 16);
+  const pad = { top: PAD_TOP, bottom: ty.label + 12, left: padLeft, right: padRight };
+  const plotW = Math.max(0, width - pad.left - pad.right);
+  const height = plotH + pad.top + pad.bottom;
+
   const byAvg = useMemo(
     () => [...series.series].sort((a, b) => mean(b.values) - mean(a.values)),
     [series],
   );
 
-  const xTicks = pickTickValues(labels, plotW, X_TICK_FONT);
+  const xTicks = pickTickValues(labels, plotW, ty.labelFont, ty.label);
   const tickLabels = {
-    fontFamily: fonts.mono400,
-    fontSize: 10,
+    ...ty.tickFont,
     fill: t.text.tick,
     padding: 6,
   };
 
-  const yPx = (v: number) => PAD.top + ((hi - v) / (hi - lo)) * plotH;
+  const yPx = (v: number) => PAD_TOP + ((hi - v) / (hi - lo)) * plotH;
 
   const nearName = useMemo(() => {
     if (!multi || hoverIdx === null || hoverY === null) return null;
@@ -134,7 +142,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [series, multi, lo, hi]);
+  }, [series, multi, lo, hi, END_LABEL_MIN_GAP]);
 
   const hoverRows = useMemo(() => {
     if (hoverIdx === null) return [];
@@ -144,19 +152,19 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
       .sort((a, b) => b.v - a.v);
   }, [series, hoverIdx]);
 
-  const crossX = hoverIdx === null ? 0 : PAD.left + (n > 1 ? ((hoverIdx - 1) / (n - 1)) * plotW : 0);
+  const crossX = hoverIdx === null ? 0 : pad.left + (n > 1 ? ((hoverIdx - 1) / (n - 1)) * plotW : 0);
   const tipTop =
     tipH > plotH
-      ? PAD.top
+      ? PAD_TOP
       : Math.min(
-          Math.max((hoverY ?? PAD.top) - tipH / 2, PAD.top),
-          PAD.top + plotH - tipH,
+          Math.max((hoverY ?? PAD_TOP) - tipH / 2, PAD_TOP),
+          PAD_TOP + plotH - tipH,
         );
   const tipLeft = Math.max(
     0,
     Math.min(
       width - tipW,
-      crossX > PAD.left + plotW / 2 ? crossX - tipW - 8 : crossX + 8,
+      crossX > pad.left + plotW / 2 ? crossX - tipW - 8 : crossX + 8,
     ),
   );
 
@@ -174,8 +182,8 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: t.text.primary }]}>{series.title}</Text>
-        <Text style={[styles.note, { color: t.text.subtle }]}>{series.note}</Text>
+        <Text style={[styles.title, { fontSize: ty.title, color: t.text.primary }]}>{series.title}</Text>
+        <Text style={[styles.note, { fontSize: ty.legend, color: t.text.subtle }]}>{series.note}</Text>
       </View>
       <Pressable
         accessible={false}
@@ -232,7 +240,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
                 grid: { stroke: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: {
-                  ...X_TICK_FONT,
+                  ...ty.labelFont,
                   fill: t.text.dim,
                   padding: 6,
                   textAnchor: ({ index }: { index?: number | string }) =>
@@ -273,7 +281,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
                       textAnchor="start"
                       dx={8}
                       dy={e.dy}
-                      style={{ fontFamily: fonts.mono400, fontSize: 10, fill: t.text.secondary }}
+                      style={{ ...ty.tickFont, fill: t.text.secondary }}
                     />
                   }
                   style={{
@@ -305,7 +313,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
                     dy={-8}
                     backgroundStyle={{ fill: t.bg.card, opacity: 0.92 }}
                     backgroundPadding={{ left: 4, right: 4, top: 2, bottom: 2 }}
-                    style={{ fontFamily: fonts.sans400, fontSize: 10, fill: t.text.muted }}
+                    style={{ ...ty.labelFont, fontSize: ty.legend, fill: t.text.muted }}
                   />
                 }
                 style={{ data: { fill: "transparent" } }}
@@ -354,7 +362,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
               },
             ]}
           >
-            <Text style={[styles.tipHead, { color: t.text.subtle }]}>{labels[hoverIdx - 1]}</Text>
+            <Text style={[styles.tipHead, { fontSize: ty.legend, color: t.text.subtle }]}>{labels[hoverIdx - 1]}</Text>
             {hoverRows.map(({ s, v }) => {
               const f = multi && s.name === focus;
               return (
@@ -365,6 +373,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
                   <Text
                     style={[
                       styles.tipName,
+                      { fontSize: ty.legend },
                       { color: f ? t.text.primary : t.text.secondary },
                       f && { fontFamily: fonts.sans600 },
                     ]}
@@ -375,6 +384,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
                   <Text
                     style={[
                       styles.tipVal,
+                      { fontSize: ty.legend },
                       { color: t.text.primary },
                       f && { fontFamily: fonts.mono500 },
                     ]}
@@ -413,7 +423,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
                 }}
               >
                 <View style={[styles.legendKey, { backgroundColor: colorOf(s) }]} />
-                <Text style={[styles.legendText, { color: t.text.secondary }]}>
+                <Text style={[styles.legendText, { fontSize: ty.legend, color: t.text.secondary }]}>
                   {glyph ? <Text style={{ color: t.text.dim }}>{glyph}</Text> : null}
                   {s.name}
                 </Text>
@@ -434,8 +444,8 @@ const styles = StyleSheet.create({
     alignItems: "baseline",
     marginBottom: 14,
   },
-  title: { fontFamily: fonts.sans700, fontSize: 13 },
-  note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
+  title: { fontFamily: fonts.sans700 },
+  note: { fontFamily: fonts.mono400, ...tabular },
   tip: {
     position: "absolute",
     borderWidth: 1,
@@ -444,11 +454,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     gap: 2,
   },
-  tipHead: { fontFamily: fonts.sans400, fontSize: 11, marginBottom: 2 },
+  tipHead: { fontFamily: fonts.sans400, marginBottom: 2 },
   tipRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   tipKey: { width: 10, height: 2 },
-  tipName: { fontFamily: fonts.sans400, fontSize: 11, flexShrink: 1 },
-  tipVal: { fontFamily: fonts.mono400, fontSize: 11, marginLeft: "auto", paddingLeft: 10, ...tabular },
+  tipName: { fontFamily: fonts.sans400, flexShrink: 1 },
+  tipVal: { fontFamily: fonts.mono400, marginLeft: "auto", paddingLeft: 10, ...tabular },
   legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 6, rowGap: 2, marginTop: 10 },
   legendItem: {
     flexDirection: "row",
@@ -460,5 +470,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
   },
   legendKey: { width: 16, height: 4, borderRadius: 2 },
-  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
+  legendText: { fontFamily: fonts.sans400 },
 });
