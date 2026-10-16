@@ -26,7 +26,7 @@
     ]
   },
   "enabledPlugins": {
-    "vercel@anthropic-plugin-directory": true,
+    "vercel@anthropic-plugin-directory": false,
     "expo@anthropic-plugin-directory": true,
     "chrome-devtools-mcp@claude-plugins-official": true,
     "claude-md-management@anthropic-plugin-directory": true,
