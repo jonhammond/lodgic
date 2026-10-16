@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { VictoryAxis, VictoryBar, VictoryChart, VictoryLabel } from "victory";
+import { barRamp, denseRankDesc } from "../../lib/color";
 import { formatByUnit, formatExact, isAdditiveKey, MetricSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
@@ -9,12 +10,9 @@ import { BAR_W, LABEL_FONT, NARROW, ROW_H, ROW_H_WRAPPED, VALUE_CHAR_W, WIDE, wr
 import { niceDomain, tickLabel } from "./scale";
 
 export const NARROW_W = 360;
-// Lightest step of the single-hue ramp; the max bar is the full hue.
-// 0.9 keeps the smallest revenue bar >= 3:1 on both panels (dark blueFocus on #262d33 = 3.09, light blue on #fff = 4.96).
-const MIN_ALPHA = 0.9;
 
 export function CategoryBarChart({ series }: { series: MetricSeries }) {
-  const { t } = useTheme();
+  const { t, scheme } = useTheme();
   const [width, setWidth] = useState(0);
   const { values, labels, color, unit } = series;
   const n = values.length;
@@ -38,8 +36,12 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
   const pad = { top: 6, bottom: 22, left: layout.left, right: Math.ceil(valueW) };
   const height = n * rowH + pad.top + pad.bottom;
   const hue = t.kpi[color].bar;
+  // Ranked single-hue ramp: deepest shade for the largest value, ties share a shade. Shade follows magnitude,
+  // not row position, so an unsorted result still reads correctly.
+  const ranks = denseRankDesc(values);
+  const ramp = barRamp(hue, t.bg.card, scheme, ranks.length ? Math.max(...ranks) + 1 : 0);
   // Victory draws x=1 at the bottom of a horizontal chart; invert so row 0 is on top.
-  const data = values.map((y, i) => ({ x: n - i, y }));
+  const data = values.map((y, i) => ({ x: n - i, y, fill: ramp[ranks[i]] }));
 
   return (
     <Card style={styles.card}>
@@ -94,10 +96,7 @@ export function CategoryBarChart({ series }: { series: MetricSeries }) {
               labelComponent={<VictoryLabel dx={4} textAnchor="start" />}
               style={{
                 data: {
-                  fill: hue,
-                  // Sequential single-hue ramp: lighter for smaller values, full hue at the max.
-                  fillOpacity: ({ datum }: { datum?: { y: number } }) =>
-                    max > 0 && datum ? MIN_ALPHA + (1 - MIN_ALPHA) * (datum.y / max) : 1,
+                  fill: ({ datum }: { datum?: { fill?: string } }) => datum?.fill ?? hue,
                 },
                 labels: {
                   fontFamily: fonts.mono400,
