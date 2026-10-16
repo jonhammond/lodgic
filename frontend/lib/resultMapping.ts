@@ -76,7 +76,15 @@ export type ComboSeries = {
   title: string;
   labels: string[];
   /** `values` are percent of the 5-point scale (raw * 20); `raw` keeps the 1-5 score. */
-  bar: { key: string; label: string; values: number[]; raw: number[]; color: ColorKey };
+  bar: {
+    key: string;
+    label: string;
+    values: number[];
+    raw: number[];
+    color: ColorKey;
+    /** Positional single-hue ramp of `color`: deepest shade on the left, fading to the right. */
+    ramp?: boolean;
+  };
   line: { key: string; label: string; values: number[]; color: ColorKey };
 };
 

@@ -82,7 +82,8 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
   const pad = { ...PAD, right: narrow ? NARROW_RIGHT : PAD.right };
   const plotW = Math.max(0, width - pad.left - pad.right);
   const height = PLOT_H + pad.top + pad.bottom;
-  const hue: Record<Metric, string> = { csat: t.kpi.guest.line, nps: t.kpi.market.line };
+  // Blue CSAT matches the hotel bars in the combo above; amber NPS matches its line.
+  const hue: Record<Metric, string> = { csat: t.kpi.revenue.line, nps: t.kpi.cost.line };
 
   const series = useMemo<SeriesDef[]>(() => {
     const names: Record<Scope, string> = { hotel: hotelName, segment: segmentLabel, portfolio: "Portfolio" };

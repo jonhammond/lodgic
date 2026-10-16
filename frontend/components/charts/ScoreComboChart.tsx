@@ -16,6 +16,7 @@ import {
   VictoryTooltip,
   VictoryVoronoiContainer,
 } from "victory";
+import { barRamp } from "../../lib/color";
 import type { ComboSeries } from "../../lib/resultMapping";
 import { fonts, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
@@ -32,7 +33,6 @@ const NARROW_W = 360;
 const NARROW_PAD = { left: 68, right: 34, bottom: 62 };
 const NARROW_TICK_ANGLE = -35;
 const NARROW_MAX_CHARS = 16;
-const NARROW_LABEL_LINES = 3;
 const DIM_OPACITY = 0.7; // non-selected bars; keeps >=3:1 against the dark card
 const PLOT_H = 200;
 const GAP = 8;
@@ -40,7 +40,7 @@ const MAX_BAR_W = 28;
 const PCT_TICKS = [0, 20, 40, 60, 80, 100];
 const X_TICK_FONT = { fontFamily: fonts.sans400, fontSize: 10 };
 const X_CHAR_W = 5.6; // sans 10px average advance
-const MAX_LABEL_CHARS = 14;
+const MAX_LABEL_CHARS = 14; // axis labels only; the selectable row wraps to its slot
 
 type BarDatum = { x: number; y: number; raw: number; score: number };
 
@@ -63,7 +63,7 @@ export function ScoreComboChart({
   note,
   footer,
 }: Props) {
-  const { t } = useTheme();
+  const { t, scheme } = useTheme();
   const [width, setWidth] = useState(0);
   const { labels, bar, line } = series;
   const n = labels.length;
@@ -75,6 +75,15 @@ export function ScoreComboChart({
   const height = PLOT_H + pad.top + pad.bottom;
   const barColor = t.kpi[bar.color];
   const lineColor = t.kpi[line.color].line;
+  // Positional ramp: deepest shade on the left. barRamp orders deep→faint where "deep" is brighter on a dark
+  // card, so reverse there to keep the darker shade on the left in both schemes.
+  const shades = useMemo(() => {
+    if (!bar.ramp) return null;
+    const ramp = barRamp(barColor.bar, t.bg.card, scheme, n);
+    return scheme === "dark" ? ramp.reverse() : ramp;
+  }, [bar.ramp, barColor.bar, t.bg.card, scheme, n]);
+  const fillFor = (i: number, active: boolean) =>
+    shades ? (shades[i] ?? barColor.bar) : active ? barColor.line : barColor.bar;
 
   // Both axes share Victory's y domain (0..100, the CSAT percent scale); the NPS line is
   // mapped onto the same five gridlines with a round step that keeps zero on a gridline.
@@ -98,14 +107,12 @@ export function ScoreComboChart({
   const dots = line.values.map((v, i) => ({ x: i + 1, y: toY(v) }));
   const barWidth =
     n > 0 ? Math.max(1, Math.min(MAX_BAR_W, (plotW - GAP * (n - 1)) / n)) : 1;
-  // Wrap each label to its slot: ~5.6px per sans-10 char, two lines max (wrapLabel). Narrow
-  // slots are too tight to wrap ("Upper Midsc…"), so the axis rotates single-line labels and
-  // the selectable label row wraps to three lines instead.
+  // Wrap each label to its slot: ~5.6px per sans-10 char. The selectable label row never
+  // truncates: it wraps the full name to as many lines as the slot needs. The axis path (no
+  // onSelect) keeps two lines wide and rotated single-line labels narrow.
   const slotChars = n > 0 ? Math.floor(plotW / n / X_CHAR_W) : MAX_LABEL_CHARS;
-  const names = narrow
-    ? labels.map((l) =>
-        wrapLabel(l ?? "", Math.max(6, slotChars), NARROW_LABEL_LINES),
-      )
+  const names = selectable
+    ? labels.map((l) => wrapLabel(l ?? "", Math.max(6, slotChars), Infinity))
     : labels.map((l) =>
         wrapLabel(l ?? "", Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars))),
       );
@@ -234,9 +241,10 @@ export function ScoreComboChart({
                         active?: boolean;
                         datum?: BarDatum;
                       }) =>
-                        active || selectedIndex === (datum?.x ?? 0) - 1
-                          ? barColor.line
-                          : barColor.bar,
+                        fillFor(
+                          (datum?.x ?? 0) - 1,
+                          active === true || selectedIndex === (datum?.x ?? 0) - 1,
+                        ),
                       fillOpacity: ({ datum }: { datum?: BarDatum }) =>
                         selectedIndex != null &&
                         selectedIndex !== (datum?.x ?? 0) - 1
@@ -245,8 +253,8 @@ export function ScoreComboChart({
                       cursor: "pointer",
                     }
                   : {
-                      fill: ({ active }: { active?: boolean }) =>
-                        active ? barColor.line : barColor.bar,
+                      fill: ({ active, datum }: { active?: boolean; datum?: BarDatum }) =>
+                        fillFor((datum?.x ?? 0) - 1, active === true),
                     },
               }}
             />
@@ -378,7 +386,6 @@ function LabelCell({
         return (
           <>
             <Text
-              numberOfLines={narrow ? NARROW_LABEL_LINES : 2}
               style={[
                 X_TICK_FONT,
                 styles.labelText,
@@ -414,15 +421,17 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.sans700, fontSize: 13, flexShrink: 1 },
   note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
   labelRow: { flexDirection: "row" },
+  // Cells stretch to the tallest wrapped label; the underline sits at the shared bottom edge.
   labelCell: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 6,
     paddingHorizontal: 2,
     cursor: "pointer",
   },
   labelCellNarrow: { paddingHorizontal: 0 },
-  labelText: { textAlign: "center", lineHeight: 12 },
+  labelText: { textAlign: "center", lineHeight: 14 },
   labelHover: { textDecorationLine: "underline" },
   labelUnderline: {
     height: 2,

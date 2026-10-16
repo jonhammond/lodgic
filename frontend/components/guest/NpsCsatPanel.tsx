@@ -118,6 +118,7 @@ export function NpsCsatPanel({ properties, selectedIds, initialTimeframe, onRows
         segments.map((s) => s.csat),
         "CSAT and NPS by segment",
         "nps-csat-segments",
+        { bar: "adr", line: "cost", ramp: true },
       ),
     [segments],
   );
@@ -130,6 +131,7 @@ export function NpsCsatPanel({ properties, selectedIds, initialTimeframe, onRows
             hotels.map((h) => h.csat),
             `Hotels in ${SEGMENT_LABEL[activeSegment]}`,
             "nps-csat-hotels",
+            { bar: "revenue", line: "cost", ramp: true },
           )
         : null,
     [hotels, activeSegment],

@@ -1,5 +1,5 @@
 import type { GuestRow } from "./npsCsat";
-import type { ComboSeries } from "./resultMapping";
+import type { ColorKey, ComboSeries } from "./resultMapping";
 import { windowDates } from "./revparEngine.ts";
 import type { Timeframe } from "./revparEngine.ts";
 
@@ -102,14 +102,22 @@ export function comboSeries(
   csat: number[],
   title: string,
   key: string,
+  colors: { bar: ColorKey; line: ColorKey; ramp?: boolean } = { bar: "guest", line: "market" },
 ): ComboSeries {
   return {
     kind: "combo",
     key,
     title,
     labels,
-    bar: { key: "csat", label: "CSAT", values: csat.map((v) => v * 20), raw: csat, color: "guest" },
-    line: { key: "nps", label: "NPS", values: nps, color: "market" },
+    bar: {
+      key: "csat",
+      label: "CSAT",
+      values: csat.map((v) => v * 20),
+      raw: csat,
+      color: colors.bar,
+      ...(colors.ramp ? { ramp: true } : {}),
+    },
+    line: { key: "nps", label: "NPS", values: nps, color: colors.line },
   };
 }
 

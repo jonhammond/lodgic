@@ -155,6 +155,11 @@ test("comboSeries shape", () => {
   assert.deepEqual(c.bar.values, [80, 100]);
   assert.deepEqual(c.bar.raw, [4, 5]);
   assert.equal(c.bar.color, "guest");
+  assert.equal(c.bar.ramp, undefined);
+  const r = comboSeries(["X"], [1], [4], "T", "k", { bar: "adr", line: "cost", ramp: true });
+  assert.equal(r.bar.color, "adr");
+  assert.equal(r.bar.ramp, true);
+  assert.equal(r.line.color, "cost");
   assert.deepEqual(c.line.values, [10, 20]);
   assert.equal(c.line.color, "market");
 });
