@@ -31,15 +31,22 @@ const MAX_BAR_W = 28;
 const INTERVALS = 4;
 const TICKS = Array.from({ length: INTERVALS + 1 }, (_, i) => (i * 100) / INTERVALS);
 
-type BarDatum = { x: number; y: number; i: number };
+type BarDatum = { x: number; y: number; y0: number; i: number };
 
-/** Round axis with exactly INTERVALS steps and zero on a gridline, so two axes share one grid. */
+/**
+ * Round axis with exactly INTERVALS steps. `lo` is a multiple of the final step, so zero always falls on
+ * a gridline, and two axes share one grid.
+ */
 function axisScale(values: number[]): { lo: number; hi: number } {
   const min = Math.min(0, ...values);
   const max = Math.max(0, ...values);
-  const rough = niceCeil((max - min) / INTERVALS);
-  const lo = Math.min(0, Math.floor(min / rough) * rough);
-  const step = niceCeil((max - lo) / INTERVALS);
+  let step = niceCeil((max - min) / INTERVALS);
+  let lo = Math.floor(min / step) * step;
+  // Flooring lo can leave the top short of max; widen to the next round step until it fits.
+  while (lo + step * INTERVALS < max - step * 1e-9) {
+    step = niceCeil(step * 1.01);
+    lo = Math.floor(min / step) * step;
+  }
   return { lo, hi: lo + step * INTERVALS };
 }
 
@@ -61,7 +68,9 @@ export function DualAxisChart({ series }: { series: DualAxisSeries }) {
   const norm = (v: number, s: { lo: number; hi: number }) => ((v - s.lo) / (s.hi - s.lo)) * 100;
   const denorm = (y: number, s: { lo: number; hi: number }) => s.lo + (y / 100) * (s.hi - s.lo);
 
-  const bars: BarDatum[] = bar.values.map((v, i) => ({ x: i + 1, y: norm(v, bs), i }));
+  // y0 anchors bars at the zero line; without it Victory draws them from the plot floor.
+  const zeroY = norm(0, bs);
+  const bars: BarDatum[] = bar.values.map((v, i) => ({ x: i + 1, y: norm(v, bs), y0: zeroY, i }));
   const dots = line.values.map((v, i) => ({ x: i + 1, y: norm(v, ls) }));
   const barWidth = n > 0 ? Math.max(1, Math.min(MAX_BAR_W, (plotW - GAP * (n - 1)) / n)) : 1;
   const slotChars = n > 0 ? Math.floor(plotW / n / X_CHAR_W) : MAX_LABEL_CHARS;

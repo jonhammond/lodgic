@@ -22,8 +22,10 @@ const HORIZONTAL_ABOVE = 6; // more categories than this lay out as rows
 const PLOT_H = 220;
 const MAX_COL_W = 36;
 const X_CHAR_W = 5.6; // sans 10px average advance
-// Same light-mode lightness offset as GroupedBarChart: adjacent hues need more than hue to separate.
+// Light-mode lightness offset as in GroupedBarChart (adjacent hues need more than hue to separate), but
+// bounded: the step shrinks as parts grow so the darkest part stays short of black (mix factor <= MAX).
 const LIGHTNESS_STEP = 0.22;
+const LIGHTNESS_MAX = 0.5;
 
 type Datum = { x: number; y: number; i: number };
 
@@ -38,7 +40,7 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
   const fillOf = (i: number) => {
     const base = t.kpi[parts[i].color].bar;
     if (i === 0 || scheme === "dark") return base;
-    return mix(base, "#000000", LIGHTNESS_STEP * i);
+    return mix(base, "#000000", Math.min(LIGHTNESS_STEP, LIGHTNESS_MAX / (parts.length - 1)) * i);
   };
   const totals = labels.map((_, i) => parts.reduce((s, p) => s + (p.values[i] ?? 0), 0));
   const hiRaw = Math.max(0, ...labels.map((_, i) => parts.reduce((s, p) => s + Math.max(0, p.values[i] ?? 0), 0)));
