@@ -2,11 +2,6 @@
 
 ## Preset chip plans (in order)
 
-- [x] Implement plan in @ZPLANS/CPORvsADR_PLAN.md
-- [x] Implement plan in @ZPLANS/NPS_CSAT_PLAN.md
-- [x] Implement plan in @ZPLANS/RevPARvsOccPlan.md
-- [x] Implement @ZPLANS/NPS_CSAT_PLAN_2.md
-- [x] Implement @ZPLANS/TIME_DEFAULT_PLAN.md
 - [ ] Implement @ZPLANS/SHADING_PLAN.md
 
 ## ADR rate/volume charts (2026-10-15 leftovers)
