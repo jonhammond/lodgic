@@ -1,4 +1,4 @@
-import { humanize } from "../components/charts/format.ts";
+import { dateAxisLabels, humanize, isDateLike } from "../components/charts/format.ts";
 import type { QueryResult } from "./api.ts";
 import { colorFor, formatByUnit, unitFor } from "./resultMapping.ts";
 import type { ColorKey, MetricUnit } from "./resultMapping.ts";
@@ -47,8 +47,8 @@ export type DualAxisSeries = {
 export type ExplicitSeries = ScatterSeries | PieSeries | StackedSeries | DualAxisSeries;
 
 const PIE_MAX_SLICES = 8;
+const SCATTER_MIN_POINTS = 3;
 const CORRELATION_THRESHOLD = 0.5;
-const ALL_COLORS: ColorKey[] = ["revenue", "adr", "revpar", "occupancy", "distribution", "cost", "market", "guest"];
 
 const num = (v: unknown): number | null => {
   if (typeof v !== "number" && typeof v !== "string") return null;
@@ -57,37 +57,60 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-/** Every row's value as a number, or null when any is missing or non-numeric. */
-function column(rows: Row[], key: string): number[] | null {
-  const out: number[] = [];
-  for (const r of rows) {
-    const n = num(r[key]);
-    if (n === null) return null;
-    out.push(n);
-  }
-  return out;
-}
+/** One canonical key per distinct hue; colorFor aliases (distribution = adr, market = revpar, guest = occupancy) share a hue. */
+const HUE_KEYS: ColorKey[] = ["revenue", "adr", "revpar", "occupancy", "cost"];
+const HUE_OF: Record<ColorKey, ColorKey> = {
+  revenue: "revenue",
+  adr: "adr",
+  distribution: "adr",
+  revpar: "revpar",
+  market: "revpar",
+  occupancy: "occupancy",
+  guest: "occupancy",
+  cost: "cost",
+};
 
-/** colorFor can repeat for related columns (direct/ota/gds all map to "distribution"); keep each part distinct. */
+/**
+ * colorFor repeats for related columns (all *_cost map to "cost"); give each part its own hue while any is left,
+ * then cycle the palette by index (the chart separates repeated hues by lightness).
+ */
 function distinctColors(keys: string[]): ColorKey[] {
-  const used: ColorKey[] = [];
-  keys.forEach((key, i) => {
+  const hues = new Set<ColorKey>();
+  return keys.map((key, i) => {
     const wanted = colorFor(key, i);
-    used.push(used.includes(wanted) ? (ALL_COLORS.find((c) => !used.includes(c)) ?? wanted) : wanted);
+    if (!hues.has(HUE_OF[wanted])) {
+      hues.add(HUE_OF[wanted]);
+      return wanted;
+    }
+    const free = HUE_KEYS.find((c) => !hues.has(c));
+    if (free) {
+      hues.add(free);
+      return free;
+    }
+    return HUE_KEYS[i % HUE_KEYS.length];
   });
-  return used;
 }
 
 const labelOf = (r: Row, key: string) => String(r[key] ?? "").trim();
 
+/** Text column to label scatter points: a name-like column first, never a date column. */
+function autoLabelKey(first: Row, skip: string[]): string | undefined {
+  const text = Object.keys(first).filter(
+    (k) => !skip.includes(k) && typeof first[k] === "string" && num(first[k]) === null && !isDateLike(first[k]),
+  );
+  return text.find((k) => /name/i.test(k)) ?? text[0];
+}
+
 function mapScatter(rows: Row[], title: string, x: string, y: string, labelKey: string | null | undefined): ScatterSeries | null {
-  const xs = column(rows, x);
-  const ys = column(rows, y);
-  if (!xs || !ys) return null;
-  const first = rows[0];
-  const textKey =
-    labelKey ??
-    Object.keys(first).find((k) => k !== x && k !== y && typeof first[k] === "string" && num(first[k]) === null);
+  const textKey = labelKey ?? autoLabelKey(rows[0], [x, y]);
+  const points: ScatterSeries["points"] = [];
+  rows.forEach((r, i) => {
+    const px = num(r[x]);
+    const py = num(r[y]);
+    if (px === null || py === null) return;
+    points.push({ label: textKey === undefined ? String(i + 1) : labelOf(r, textKey) || String(i + 1), x: px, y: py });
+  });
+  if (points.length < SCATTER_MIN_POINTS) return null;
   return {
     kind: "scatter",
     key: `${x}:${y}`,
@@ -96,22 +119,19 @@ function mapScatter(rows: Row[], title: string, x: string, y: string, labelKey: 
     yLabel: humanize(y),
     xUnit: unitFor(x),
     yUnit: unitFor(y),
-    points: rows.map((r, i) => ({
-      label: textKey === undefined ? String(i + 1) : labelOf(r, textKey) || String(i + 1),
-      x: xs[i],
-      y: ys[i],
-    })),
+    points,
   };
 }
 
 function mapPie(rows: Row[], title: string, x: string, y: string): PieSeries | null {
-  const values = column(rows, y);
-  if (!values || values.some((v) => v < 0)) return null;
-  const total = values.reduce((a, b) => a + b, 0);
+  const usable = rows.flatMap((r) => {
+    const value = num(r[y]);
+    return value === null ? [] : [{ label: labelOf(r, x), value }];
+  });
+  if (usable.length === 0 || usable.some((s) => s.value < 0)) return null;
+  const total = usable.reduce((a, s) => a + s.value, 0);
   if (total <= 0) return null;
-  const sorted = rows
-    .map((r, i) => ({ label: labelOf(r, x), value: values[i] }))
-    .sort((a, b) => b.value - a.value);
+  const sorted = usable.sort((a, b) => b.value - a.value);
   const kept = sorted.slice(0, PIE_MAX_SLICES);
   const rest = sorted.slice(PIE_MAX_SLICES);
   if (rest.length > 0) kept.push({ label: "Other", value: rest.reduce((a, s) => a + s.value, 0) });
@@ -127,8 +147,9 @@ function mapPie(rows: Row[], title: string, x: string, y: string): PieSeries | n
 function mapStacked(rows: Row[], title: string, x: string, ys: string[]): StackedSeries | null {
   const units = new Set(ys.map(unitFor));
   if (units.size !== 1) return null;
-  const cols = ys.map((y) => column(rows, y));
-  if (cols.some((c) => c === null)) return null;
+  // Missing or non-numeric parts count as 0; nothing usable at all falls through.
+  const cols = ys.map((y) => rows.map((r) => num(r[y]) ?? 0));
+  if (!rows.some((r) => ys.some((y) => num(r[y]) !== null))) return null;
   const colors = distinctColors(ys);
   return {
     kind: "stacked",
@@ -136,22 +157,25 @@ function mapStacked(rows: Row[], title: string, x: string, ys: string[]): Stacke
     title,
     unit: unitFor(ys[0]),
     labels: rows.map((r) => labelOf(r, x)),
-    parts: ys.map((key, i) => ({ key, title: humanize(key), values: cols[i] as number[], color: colors[i] })),
+    parts: ys.map((key, i) => ({ key, title: humanize(key), values: cols[i], color: colors[i] })),
   };
 }
 
 function mapDual(rows: Row[], title: string, x: string, barKey: string, lineKey: string): DualAxisSeries | null {
-  const bar = column(rows, barKey);
-  const line = column(rows, lineKey);
-  if (!bar || !line) return null;
+  const usable = rows.flatMap((r) => {
+    const b = num(r[barKey]);
+    const l = num(r[lineKey]);
+    return b === null || l === null ? [] : [{ label: labelOf(r, x), b, l }];
+  });
+  if (usable.length === 0) return null;
   const [barColor, lineColor] = distinctColors([barKey, lineKey]);
   return {
     kind: "dual",
     key: `${barKey}+${lineKey}`,
     title,
-    labels: rows.map((r) => labelOf(r, x)),
-    bar: { key: barKey, title: humanize(barKey), values: bar, unit: unitFor(barKey), color: barColor },
-    line: { key: lineKey, title: humanize(lineKey), values: line, unit: unitFor(lineKey), color: lineColor },
+    labels: dateAxisLabels(usable.map((u) => u.label)).labels,
+    bar: { key: barKey, title: humanize(barKey), values: usable.map((u) => u.b), unit: unitFor(barKey), color: barColor },
+    line: { key: lineKey, title: humanize(lineKey), values: usable.map((u) => u.l), unit: unitFor(lineKey), color: lineColor },
   };
 }
 

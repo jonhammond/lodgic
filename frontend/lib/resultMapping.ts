@@ -1,5 +1,6 @@
 import {
   columnRoles,
+  dateAxisLabels,
   formatCompactCurrency,
   formatCurrency,
   formatIndex,
@@ -422,13 +423,9 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
   // column with 2+ rows renders one bar chart per metric (README "How results map").
   const { xKey, yKeys } = columnRoles(rows);
   const xs = rows.map((r) => String(r[xKey] ?? ""));
-  const dated = xs.every(isDateLike);
+  const { labels, dated, monthly } = dateAxisLabels(xs);
   if ((chart === "line" || dated) && rows.length > 1) {
     if (yKeys.length === 0) return { headline: title, facts: tableFacts(rows), charts: [], pair: null, table: tableOf() };
-    const monthly = dated && xs.every((x) => x.slice(8, 10) === "01");
-    const labels = xs.map((x) =>
-      monthly ? monthLabel(x) : dated ? `${x.slice(5, 7)}/${x.slice(8, 10)}` : x,
-    );
     const curYm = now.toISOString().slice(0, 7);
     const partialLast = monthly && xs[xs.length - 1].slice(0, 7) === curYm;
     const dim = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();

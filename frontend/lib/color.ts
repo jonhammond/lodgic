@@ -70,8 +70,18 @@ export function dimStroke(hex: string, surface: string, fade = 0.45): string {
 }
 
 // n shades of `hue` from deep (index 0) to faint (index n-1) for bars on `surface`.
-export function barRamp(hue: string, surface: string, scheme: Scheme, n: number): string[] {
-  const { deepen, fade, toward } = scheme === "dark" ? DARK : LIGHT;
+// `spread` overrides the scheme's deepen / fade amounts for charts that need adjacent shades further apart.
+export function barRamp(
+  hue: string,
+  surface: string,
+  scheme: Scheme,
+  n: number,
+  spread: { deepen?: number; fade?: number } = {},
+): string[] {
+  const base = scheme === "dark" ? DARK : LIGHT;
+  const { toward } = base;
+  const deepen = spread.deepen ?? base.deepen;
+  const fade = spread.fade ?? base.fade;
   const deep = mix(hue, toward, deepen);
   if (n <= 0) return [];
   if (n === 1) return [deep];

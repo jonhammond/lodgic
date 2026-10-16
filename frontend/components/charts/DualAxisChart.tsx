@@ -19,10 +19,12 @@ import { wrapLabel } from "./rows";
 import { niceCeil, tickLabel } from "./scale";
 
 const PAD = { top: 10, bottom: 34, left: 58, right: 58 };
-const NARROW_PAD = { left: 52, right: 48, bottom: 62 };
+const NARROW_PAD = { left: 64, right: 48, bottom: 62 };
 const NARROW_W = 360;
 const NARROW_TICK_ANGLE = -35;
-const NARROW_MAX_CHARS = 16;
+const NARROW_WRAP_CHARS = 12; // per line of a rotated label
+const MAX_LABEL_LINES = 3;
+const LINE_H = 12;
 const MAX_LABEL_CHARS = 14;
 const X_CHAR_W = 5.6; // sans 10px average advance
 const PLOT_H = 220;
@@ -57,9 +59,8 @@ export function DualAxisChart({ series }: { series: DualAxisSeries }) {
   const { labels, bar, line } = series;
   const n = labels.length;
   const narrow = width > 0 && width < NARROW_W;
-  const pad = narrow ? { ...PAD, ...NARROW_PAD } : PAD;
-  const plotW = Math.max(0, width - pad.left - pad.right);
-  const height = PLOT_H + pad.top + pad.bottom;
+  const basePad = narrow ? { ...PAD, ...NARROW_PAD } : PAD;
+  const plotW = Math.max(0, width - basePad.left - basePad.right);
   const barColor = t.kpi[bar.color];
   const lineColor = t.kpi[line.color].line;
 
@@ -74,12 +75,12 @@ export function DualAxisChart({ series }: { series: DualAxisSeries }) {
   const dots = line.values.map((v, i) => ({ x: i + 1, y: norm(v, ls) }));
   const barWidth = n > 0 ? Math.max(1, Math.min(MAX_BAR_W, (plotW - GAP * (n - 1)) / n)) : 1;
   const slotChars = n > 0 ? Math.floor(plotW / n / X_CHAR_W) : MAX_LABEL_CHARS;
-  const names = narrow
-    ? labels.map((l) => {
-        const s = (l ?? "").trim();
-        return s.length > NARROW_MAX_CHARS ? `${s.slice(0, NARROW_MAX_CHARS - 1)}…` : s;
-      })
-    : labels.map((l) => wrapLabel(l ?? "", Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars))));
+  const names = labels.map((l) =>
+    wrapLabel(l ?? "", narrow ? NARROW_WRAP_CHARS : Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars)), MAX_LABEL_LINES),
+  );
+  const lines = Math.max(1, ...names.map((s) => s.split("\n").length));
+  const pad = { ...basePad, bottom: basePad.bottom + (lines - 1) * LINE_H };
+  const height = PLOT_H + pad.top + pad.bottom;
   const tickLabels = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
 
   return (

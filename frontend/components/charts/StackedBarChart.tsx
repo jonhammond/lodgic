@@ -26,6 +26,8 @@ const X_CHAR_W = 5.6; // sans 10px average advance
 // bounded: the step shrinks as parts grow so the darkest part stays short of black (mix factor <= MAX).
 const LIGHTNESS_STEP = 0.22;
 const LIGHTNESS_MAX = 0.5;
+const DARK_LIFT = 0.35; // per repeated hue
+const DARK_LIFT_MAX = 0.6;
 
 type Datum = { x: number; y: number; i: number };
 
@@ -39,7 +41,12 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
   const horizontal = n > HORIZONTAL_ABOVE || narrow;
   const fillOf = (i: number) => {
     const base = t.kpi[parts[i].color].bar;
-    if (i === 0 || scheme === "dark") return base;
+    if (scheme === "dark") {
+      // Parts beyond the palette's distinct hues repeat one; lift each repeat toward white.
+      const repeats = parts.slice(0, i).filter((p) => t.kpi[p.color].bar === base).length;
+      return repeats === 0 ? base : mix(base, "#ffffff", Math.min(DARK_LIFT_MAX, DARK_LIFT * repeats));
+    }
+    if (i === 0) return base;
     return mix(base, "#000000", Math.min(LIGHTNESS_STEP, LIGHTNESS_MAX / (parts.length - 1)) * i);
   };
   const totals = labels.map((_, i) => parts.reduce((s, p) => s + (p.values[i] ?? 0), 0));
@@ -51,6 +58,9 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
 
   // Horizontal: row 0 on top (Victory draws x=1 at the bottom of a horizontal chart).
   const xOf = (i: number) => (horizontal ? n - i : i + 1);
+  // VictoryStack's fillData walks each dataset by index against the ascending x set, so data must be
+  // ascending in x; descending x silently drops every row after the first.
+  const order = labels.map((_, i) => (horizontal ? n - 1 - i : i));
   const layout = narrow ? NARROW : WIDE;
   const hNames = labels.map((l) => wrapLabel(l ?? "", layout.chars));
   const rowH = hNames.some((s) => s.includes("\n")) ? ROW_H_WRAPPED : ROW_H;
@@ -135,8 +145,8 @@ export function StackedBarChart({ series }: { series: StackedSeries }) {
               {parts.map((p, pi) => (
                 <VictoryBar
                   key={p.key}
-                  data={labels.map(
-                    (_, i): Datum => ({ x: xOf(i), y: p.values[i] ?? 0, i }),
+                  data={order.map(
+                    (i): Datum => ({ x: xOf(i), y: p.values[i] ?? 0, i }),
                   )}
                   barWidth={barWidth}
                   labels={({ datum }) => [

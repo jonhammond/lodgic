@@ -11,6 +11,8 @@ import { formatPercent } from "./format";
 
 const SIDE_BY_SIDE_W = 480;
 const DONUT_MAX = 220;
+const LEGEND_MAX_W = 320;
+const DARK_SPREAD = { deepen: 0.6, fade: 0.65 };
 
 /** Share-of-total donut; the legend carries the exact values, so slices are unlabelled. */
 export function PieChart({ series }: { series: PieSeries }) {
@@ -19,7 +21,8 @@ export function PieChart({ series }: { series: PieSeries }) {
   const { slices, unit } = series;
   const n = slices.length;
   // Slices arrive sorted largest-first (trailing "Other"): deepest shade on the largest.
-  const ramp = barRamp(t.kpi.market.bar, t.bg.card, scheme, n);
+  // Dark needs a wider span: the default ramp leaves adjacent lilac slices near-identical.
+  const ramp = barRamp(t.kpi.market.bar, t.bg.card, scheme, n, scheme === "dark" ? DARK_SPREAD : {});
   const wide = width >= SIDE_BY_SIDE_W;
   const size = Math.max(0, Math.min(DONUT_MAX, wide ? width / 2 : width));
 
@@ -59,7 +62,9 @@ export function PieChart({ series }: { series: PieSeries }) {
                   <Text style={[styles.value, { color: t.text.primary }]}>
                     {formatByUnit(s.value, unit)}
                   </Text>
-                  <Text style={[styles.pct, { color: t.text.subtle }]}>{formatPercent(s.pct)}</Text>
+                  {unit !== "percent" && (
+                    <Text style={[styles.pct, { color: t.text.subtle }]}>{formatPercent(s.pct)}</Text>
+                  )}
                 </View>
               ))}
             </View>
@@ -75,9 +80,9 @@ const styles = StyleSheet.create({
   header: { marginBottom: 10 },
   title: { fontFamily: fonts.sans700, fontSize: 13 },
   body: { alignItems: "center", gap: 12 },
-  bodyWide: { flexDirection: "row", gap: 20 },
+  bodyWide: { flexDirection: "row", gap: 20, justifyContent: "center" },
   legend: { alignSelf: "stretch", gap: 4 },
-  legendWide: { flex: 1, alignSelf: "center" },
+  legendWide: { flex: 1, maxWidth: LEGEND_MAX_W, alignSelf: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   key: { width: 10, height: 10, borderRadius: 2 },
   name: { fontFamily: fonts.sans400, fontSize: 11, flex: 1 },

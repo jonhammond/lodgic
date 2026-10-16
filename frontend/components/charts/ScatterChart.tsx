@@ -21,6 +21,7 @@ const PAD_NARROW = { ...PAD, left: 62, right: 14 };
 const NARROW_W = 360;
 const LABEL_MIN_W = 480;
 const LABEL_MAX_POINTS = 10;
+const EDGE_FRAC = 0.15; // labels this close to a domain edge anchor inward instead of centring
 
 type Datum = { x: number; y: number; label: string; fill: string };
 
@@ -39,6 +40,11 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
   const ramp = barRamp(t.kpi.market.bar, t.bg.card, scheme, ranks.length ? Math.max(...ranks) + 1 : 0);
   const data: Datum[] = points.map((p, i) => ({ x: p.x, y: p.y, label: p.label, fill: ramp[ranks[i]] }));
   const named = n <= LABEL_MAX_POINTS && width >= LABEL_MIN_W;
+  const xSpan = xd.hi - xd.lo || 1;
+  const nameAnchor = ({ datum }: { datum?: Datum }) => {
+    const f = datum ? (datum.x - xd.lo) / xSpan : 0.5;
+    return f > 1 - EDGE_FRAC ? "end" : f < EDGE_FRAC ? "start" : "middle";
+  };
   const tick = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
   const axisLabel = { fontFamily: fonts.sans400, fontSize: 11, fill: t.text.dim };
 
@@ -75,13 +81,13 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
               tickValues={yd.ticks}
               tickFormat={(v: number) => tickLabel(v, yUnit)}
               label={series.yLabel}
-              axisLabelComponent={<VictoryLabel dy={-10} />}
+              axisLabelComponent={<VictoryLabel />}
               style={{
                 axis: { stroke: "transparent" },
                 grid: { stroke: t.border.axis, strokeWidth: 1, strokeDasharray: "none" },
                 ticks: { stroke: "transparent" },
                 tickLabels: { ...tick, textAnchor: "end" },
-                axisLabel: { ...axisLabel, padding: narrow ? 46 : 56 },
+                axisLabel: { ...axisLabel, padding: pad.left - 16 },
               }}
             />
             <VictoryScatter
@@ -117,7 +123,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
                 data={data}
                 size={0}
                 labels={({ datum }) => (datum as Datum).label}
-                labelComponent={<VictoryLabel dy={-12} textAnchor="middle" />}
+                labelComponent={<VictoryLabel dy={-12} textAnchor={nameAnchor} />}
                 style={{
                   data: { fill: "transparent" },
                   labels: { fontFamily: fonts.sans400, fontSize: 10, fill: t.text.dim },

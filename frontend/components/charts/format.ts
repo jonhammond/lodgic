@@ -50,6 +50,14 @@ export function formatDateTick(v: unknown): string {
   return isDateLike(s) ? `${s.slice(5, 7)}/${s.slice(8, 10)}` : s;
 }
 
+/** Category-axis labels: month names when every date is the 1st, MM/DD for other dates, raw text otherwise. */
+export function dateAxisLabels(xs: string[]): { labels: string[]; dated: boolean; monthly: boolean } {
+  const dated = xs.length > 0 && xs.every(isDateLike);
+  const monthly = dated && xs.every((x) => x.slice(8, 10) === "01");
+  const labels = xs.map((x) => (monthly ? monthLabel(x) : dated ? `${x.slice(5, 7)}/${x.slice(8, 10)}` : x));
+  return { labels, dated, monthly };
+}
+
 export function columnRoles(rows: Row[]): { xKey: string; yKeys: string[] } {
   const cols = rows.length ? Object.keys(rows[0]) : [];
   const numericCol = (k: string) =>

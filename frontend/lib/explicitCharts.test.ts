@@ -35,13 +35,14 @@ test("scatter label prefers spec.label, falls back to row index", () => {
   const rows = [
     { code: "A", adr: "100", occ: "60" },
     { code: "B", adr: "150", occ: "70" },
+    { code: "C", adr: "175", occ: "75" },
   ];
   const labelled = mapExplicit(result("scatter", { x: "adr", y: ["occ"], label: "code" }, rows)) as ScatterSeries;
-  assert.deepEqual(labelled.points.map((p) => p.label), ["A", "B"]);
-  assert.deepEqual(labelled.points.map((p) => p.x), [100, 150]);
-  const numericOnly = [{ adr: 100, occ: 60 }, { adr: 150, occ: 70 }];
+  assert.deepEqual(labelled.points.map((p) => p.label), ["A", "B", "C"]);
+  assert.deepEqual(labelled.points.map((p) => p.x), [100, 150, 175]);
+  const numericOnly = [{ adr: 100, occ: 60 }, { adr: 150, occ: 70 }, { adr: 175, occ: 75 }];
   const indexed = mapExplicit(result("scatter", { x: "adr", y: ["occ"] }, numericOnly)) as ScatterSeries;
-  assert.deepEqual(indexed.points.map((p) => p.label), ["1", "2"]);
+  assert.deepEqual(indexed.points.map((p) => p.label), ["1", "2", "3"]);
 });
 
 test("pie sorts slices descending with pct of total", () => {
@@ -127,11 +128,7 @@ test("missing column, non-numeric y, empty rows, no spec and legacy kinds return
   assert.equal(mapExplicit(result("pie", { x: "name", y: ["v"] }, [])), null);
   assert.equal(mapExplicit(result("pie", null, rows)), null);
   assert.equal(mapExplicit(result("bar", { x: "name", y: ["v"] }, rows)), null);
-  assert.equal(
-    mapExplicit(result("pie", { x: "name", y: ["v"] }, [{ name: "A", v: 1 }, { name: "B", v: "n/a" }])),
-    null,
-  );
-  assert.equal(mapExplicit(result("pie", { x: "name", y: ["v"] }, [{ name: "A", v: 1 }, { name: "B", v: null }])), null);
+  assert.equal(mapExplicit(result("pie", { x: "name", y: ["v"] }, [{ name: "A", v: "n/a" }, { name: "B", v: null }])), null);
   assert.equal(
     mapExplicit(result("scatter", { x: "name", y: ["v"] }, rows)),
     null,
@@ -218,4 +215,81 @@ test("dual facts: max bar and max line", () => {
   assert.match(facts[0], /900/);
   assert.match(facts[1], /Alpine Lodge/);
   assert.match(facts[1], /\$170/);
+});
+
+test("rows with null x or y are dropped from scatter, pie and combo", () => {
+  const scatterRows = [
+    { name: "A", x: 1, y: 5 },
+    { name: "B", x: null, y: 6 },
+    { name: "C", x: 3, y: null },
+    { name: "D", x: 4, y: 8 },
+    { name: "E", x: 5, y: 9 },
+  ];
+  const sc = mapExplicit(result("scatter", { x: "x", y: ["y"] }, scatterRows)) as ScatterSeries;
+  assert.deepEqual(sc.points.map((p) => p.label), ["A", "D", "E"]);
+  assert.equal(mapExplicit(result("scatter", { x: "x", y: ["y"] }, scatterRows.slice(0, 4))), null, "under 3 usable points");
+
+  const pie = mapExplicit(
+    result("pie", { x: "c", y: ["v"] }, [{ c: "A", v: 1 }, { c: "B", v: null }, { c: "C", v: 3 }]),
+  ) as PieSeries;
+  assert.deepEqual(pie.slices.map((x) => x.label), ["C", "A"]);
+
+  const dual = mapExplicit(
+    result("combo", { x: "n", y: ["rooms_sold"], y2: "adr" }, [
+      { n: "A", rooms_sold: 1, adr: 10 },
+      { n: "B", rooms_sold: null, adr: 20 },
+      { n: "C", rooms_sold: 3, adr: null },
+      { n: "D", rooms_sold: 4, adr: 40 },
+    ]),
+  ) as DualAxisSeries;
+  assert.deepEqual(dual.labels, ["A", "D"]);
+  assert.deepEqual(dual.bar.values, [1, 4]);
+  assert.deepEqual(dual.line.values, [10, 40]);
+});
+
+test("stacked treats null parts as 0 and falls through when nothing is usable", () => {
+  const rows = [
+    { m: "Jan", a_bookings: 10, b_bookings: null },
+    { m: "Feb", a_bookings: null, b_bookings: 7 },
+  ];
+  const s = mapExplicit(result("stacked_bar", { x: "m", y: ["a_bookings", "b_bookings"] }, rows)) as StackedSeries;
+  assert.deepEqual(s.parts.map((p) => p.values), [[10, 0], [0, 7]]);
+  const empty = [{ m: "Jan", a_bookings: null, b_bookings: null }];
+  assert.equal(mapExplicit(result("stacked_bar", { x: "m", y: ["a_bookings", "b_bookings"] }, empty)), null);
+});
+
+test("stacked parts get distinct hues even for same-family columns", () => {
+  const cols = ["rooms_cost", "fnb_cost", "admin_cost", "marketing_cost", "maintenance_cost"];
+  const rows = [Object.fromEntries([["p", "A"], ...cols.map((c, i) => [c, i + 1])])];
+  const s = mapExplicit(result("stacked_bar", { x: "p", y: cols }, rows)) as StackedSeries;
+  const hue: Record<string, string> = { distribution: "adr", market: "revpar", guest: "occupancy" };
+  assert.equal(new Set(s.parts.map((p) => hue[p.color] ?? p.color)).size, 5);
+});
+
+test("scatter auto-label prefers a name column and skips date columns", () => {
+  const rows = [
+    { metric_date: "2026-01-01", note: "x", property_name: "Harbor Inn", adr: 100, occ: 60 },
+    { metric_date: "2026-01-02", note: "y", property_name: "Alpine Lodge", adr: 150, occ: 70 },
+    { metric_date: "2026-01-03", note: "z", property_name: "City Suites", adr: 175, occ: 75 },
+  ];
+  const s = mapExplicit(result("scatter", { x: "adr", y: ["occ"] }, rows)) as ScatterSeries;
+  assert.deepEqual(s.points.map((p) => p.label), ["Harbor Inn", "Alpine Lodge", "City Suites"]);
+  const dateOnly = rows.map(({ metric_date, adr, occ }) => ({ metric_date, adr, occ }));
+  const d = mapExplicit(result("scatter", { x: "adr", y: ["occ"] }, dateOnly)) as ScatterSeries;
+  assert.deepEqual(d.points.map((p) => p.label), ["1", "2", "3"]);
+});
+
+test("combo formats date-like x as MM/DD, or month names when all on the 1st", () => {
+  const daily = [
+    { d: "2026-03-05", rooms_sold: 10, adr: 100 },
+    { d: "2026-03-06", rooms_sold: 12, adr: 110 },
+  ];
+  const a = mapExplicit(result("combo", { x: "d", y: ["rooms_sold"], y2: "adr" }, daily)) as DualAxisSeries;
+  assert.deepEqual(a.labels, ["03/05", "03/06"]);
+  const monthly = [
+    { d: "2026-01-01", rooms_sold: 10, adr: 100 },
+    { d: "2026-02-01", rooms_sold: 12, adr: 110 },
+  ];
+  const b = mapExplicit(result("combo", { x: "d", y: ["rooms_sold"], y2: "adr" }, monthly)) as DualAxisSeries;
+  assert.deepEqual(b.labels, ["Jan", "Feb"]);
 });
