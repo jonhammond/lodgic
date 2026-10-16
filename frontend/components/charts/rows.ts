@@ -28,3 +28,8 @@ export function wrapLabel(s: string, chars: number, maxLines = 2): string {
   const tail = lines.slice(maxLines - 1).join(" ");
   return [...head, `${tail.slice(0, chars - 1)}…`].join("\n");
 }
+
+/** Single-line label: clipped with an ellipsis beyond `chars`. */
+export function truncateLabel(s: string, chars: number): string {
+  return s.length > chars ? `${s.slice(0, Math.max(1, chars - 1)).trimEnd()}…` : s;
+}

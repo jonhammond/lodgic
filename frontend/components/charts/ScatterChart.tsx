@@ -21,9 +21,13 @@ const PAD_NARROW = { ...PAD, left: 62, right: 14 };
 const NARROW_W = 360;
 const LABEL_MIN_W = 480;
 const LABEL_MAX_POINTS = 10;
-const EDGE_FRAC = 0.15; // labels this close to a domain edge anchor inward instead of centring
+const EDGE_FRAC = 0.15;
+const LABEL_CLASH_W = 100; // px: two labels closer than this horizontally…
+const LABEL_CLASH_H = 16; // …and vertically would overlap
+const LABEL_DY_ABOVE = -12;
+const LABEL_DY_BELOW = 16; // labels this close to a domain edge anchor inward instead of centring
 
-type Datum = { x: number; y: number; label: string; fill: string };
+type Datum = { x: number; y: number; label: string; fill: string; dy?: number };
 
 /** Two-metric correlation: one point per category, shaded by y-rank. */
 export function ScatterChart({ series }: { series: ScatterSeries }) {
@@ -45,6 +49,24 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
     const f = datum ? (datum.x - xd.lo) / xSpan : 0.5;
     return f > 1 - EDGE_FRAC ? "end" : f < EDGE_FRAC ? "start" : "middle";
   };
+  // Labels default above the point; a point whose label would overlap an earlier (by x) point's
+  // label drops below its point instead. Stored on the datum because Victory clones data objects.
+  const ySpan = yd.hi - yd.lo || 1;
+  const plotW = Math.max(1, width - pad.left - pad.right);
+  const plotH = Math.max(1, height - pad.top - pad.bottom);
+  const px = (p: Datum) => ((p.x - xd.lo) / xSpan) * plotW;
+  const py = (p: Datum) => ((yd.hi - p.y) / ySpan) * plotH;
+  for (const i of data.map((_, k) => k).sort((a, b) => data[a].x - data[b].x)) {
+    const d = data[i];
+    const clash = data.some(
+      (o) =>
+        o !== d &&
+        o.dy === LABEL_DY_ABOVE &&
+        Math.abs(px(d) - px(o)) < LABEL_CLASH_W &&
+        Math.abs(py(d) - py(o)) < LABEL_CLASH_H,
+    );
+    d.dy = clash ? LABEL_DY_BELOW : LABEL_DY_ABOVE;
+  }
   const tick = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
   const axisLabel = { fontFamily: fonts.sans400, fontSize: 11, fill: t.text.dim };
 
@@ -123,7 +145,12 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
                 data={data}
                 size={0}
                 labels={({ datum }) => (datum as Datum).label}
-                labelComponent={<VictoryLabel dy={-12} textAnchor={nameAnchor} />}
+                labelComponent={
+                  <VictoryLabel
+                    dy={({ datum }: { datum?: Datum }) => datum?.dy ?? LABEL_DY_ABOVE}
+                    textAnchor={nameAnchor}
+                  />
+                }
                 style={{
                   data: { fill: "transparent" },
                   labels: { fontFamily: fonts.sans400, fontSize: 10, fill: t.text.dim },

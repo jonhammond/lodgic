@@ -15,14 +15,14 @@ import type { DualAxisSeries } from "../../lib/explicitCharts";
 import { fonts } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
-import { wrapLabel } from "./rows";
+import { truncateLabel, wrapLabel } from "./rows";
 import { niceCeil, tickLabel } from "./scale";
 
 const PAD = { top: 10, bottom: 34, left: 58, right: 58 };
-const NARROW_PAD = { left: 64, right: 48, bottom: 62 };
+const NARROW_PAD = { left: 64, right: 48, bottom: 88 };
 const NARROW_W = 360;
-const NARROW_TICK_ANGLE = -35;
-const NARROW_WRAP_CHARS = 12; // per line of a rotated label
+const NARROW_TICK_ANGLE = -60;
+const NARROW_LABEL_CHARS = 16; // single rotated line, ellipsised beyond this
 const MAX_LABEL_LINES = 3;
 const LINE_H = 12;
 const MAX_LABEL_CHARS = 14;
@@ -75,8 +75,11 @@ export function DualAxisChart({ series }: { series: DualAxisSeries }) {
   const dots = line.values.map((v, i) => ({ x: i + 1, y: norm(v, ls) }));
   const barWidth = n > 0 ? Math.max(1, Math.min(MAX_BAR_W, (plotW - GAP * (n - 1)) / n)) : 1;
   const slotChars = n > 0 ? Math.floor(plotW / n / X_CHAR_W) : MAX_LABEL_CHARS;
+  // Narrow: one steeply rotated line per label (wrapped multi-line labels pile up at ~20px pitch).
   const names = labels.map((l) =>
-    wrapLabel(l ?? "", narrow ? NARROW_WRAP_CHARS : Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars)), MAX_LABEL_LINES),
+    narrow
+      ? truncateLabel(l ?? "", NARROW_LABEL_CHARS)
+      : wrapLabel(l ?? "", Math.max(6, Math.min(MAX_LABEL_CHARS, slotChars)), MAX_LABEL_LINES),
   );
   const lines = Math.max(1, ...names.map((s) => s.split("\n").length));
   const pad = { ...basePad, bottom: basePad.bottom + (lines - 1) * LINE_H };
