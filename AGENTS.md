@@ -2,51 +2,45 @@
 
 ## Project
 
-Hospitality analytics AI demo: natural-language questions → Gemini 3.1 Flash-Lite generates SQL → executed read-only in Supabase → KPI tiles / charts / tables. Public (no auth), rate-limited, embedded in a portfolio site via iframe. Deployed: frontend on Vercel (lodgic.jonhammond.org), Edge Function + schema in the production Supabase project. Open items in `TODO.md`.
+Hospitality analytics demo: NL question → Gemini generates SQL → read-only execution in Supabase → KPI tiles / charts / tables. Public, no auth, rate-limited, iframed into a portfolio site. Prod: frontend on Vercel (lodgic.jonhammond.org), Edge Function + schema in the production Supabase project. Open items: `TODO.md`.
 
 ## Boundaries
 
-- All schema work as versioned migrations in `supabase/migrations/`; apply locally with `supabase migration up`. Production apply only via MCP `apply_migration` after explicit user confirmation.
-- Clients never execute SQL directly: the Edge Function (service_role) calls `run_hotel_analytics`, which runs queries as the SELECT-only `analytics_ro` role in a read-only transaction. Keep that layering intact.
-- Secrets live in `supabase/functions/.env` locally (gitignored) and `supabase secrets set` in prod: `GEMINI_API_KEY`, `IP_HASH_SALT`, optional `ALLOWED_ORIGINS`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`. Names documented in `supabase/functions/.env.example`.
+- Schema changes only as migrations in `supabase/migrations/`; apply locally with `supabase migration up`, in prod only via MCP `apply_migration` after explicit user confirmation.
+- Clients never run SQL. Edge Function (service_role) → `run_hotel_analytics` → SELECT-only `analytics_ro` role in a read-only transaction. Keep this layering.
+- Secrets: `supabase/functions/.env` locally (gitignored), `supabase secrets set` in prod. Names in `supabase/functions/.env.example`: `GEMINI_API_KEY`, `IP_HASH_SALT`; optional `ALLOWED_ORIGINS`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`.
 
 ## Stack
 
-- Supabase Postgres: `properties`, `daily_metrics` (RLS, anon SELECT), `ai_query_log` (rate limiting, service_role only), `ai_sql_cache` (service_role only), `pg_cron` nightly generator `generate_daily_hotel_metrics(date)`, seed = 10 properties × 90 days.
-- Edge Function `supabase/functions/text-to-sql/` (Deno): CORS allow-list, salted SHA-256 IP hash, 60 req/hr/IP plus a global 30 req/min cap (`count_queries_last_minute`; cache hits exempt), Gemini structured JSON output (`{sql, recommended_chart, report_title, caveat, period_label, period_source}`; questions naming no period default to the last 30 days, `period_source` = `default`), `sql_guard.ts` validation mirroring the RPC checks, then a second non-fatal Gemini pass over the result rows producing `summary` (2–5 sentences, `summary_prompt.ts`; null on failure). `ai_sql_cache` (service_role only) stores validated SQL + summary keyed by hash(system prompt, normalized scoped question), TTL `SQL_CACHE_TTL_HOURS` (default 168); a hit skips the SQL call and reuses the summary when the rows hash matches. Header `x-cache-bypass: 1` forces a fresh generation (prompt-regress sends it). Both calls log `usageMetadata` as `{"usage":...}` lines. Tests: `deno test` in that directory.
-- Frontend: `frontend/` Expo blank-TS / React Native Web, `victory` charts (imported only in `components/charts/`), design tokens in `frontend/theme/`; static export to Vercel pending.
+- Postgres: `properties`, `daily_metrics` (RLS, anon SELECT); `ai_query_log`, `ai_sql_cache` (service_role only); `pg_cron` nightly `generate_daily_hotel_metrics(date)`; seed 10 properties × 90 days.
+- Edge Function `supabase/functions/text-to-sql/` (Deno): CORS allow-list; salted SHA-256 IP hash; 60 req/hr/IP + global 30 req/min (`count_queries_last_minute`, cache hits exempt); Gemini structured JSON `{sql, recommended_chart, report_title, caveat, period_label, period_source}` (no period named → last 30 days, `period_source=default`); `sql_guard.ts` mirrors the RPC checks; second non-fatal Gemini pass over rows → `summary` (2–5 sentences, `summary_prompt.ts`, null on failure). Cache keyed by hash(system prompt, normalized scoped question), TTL `SQL_CACHE_TTL_HOURS` (default 168); a hit skips the SQL call and reuses the summary when the rows hash matches; header `x-cache-bypass: 1` forces regeneration (prompt-regress sends it). Both Gemini calls log `{"usage":...}` lines. Tests: `deno test` in that dir.
+- Gemini: `gemini-3.1-flash-lite` (`GEMINI_MODEL`); one retry on 429 with `gemini-3.5-flash-lite` (`GEMINI_FALLBACK_MODEL`, empty disables). `generativelanguage.googleapis.com/v1beta`, key in `x-goog-api-key`, `responseMimeType: application/json` + `responseSchema`. Free-tier quotas are per project + model, visible only in AI Studio.
+- Frontend `frontend/`: Expo blank-TS / React Native Web; `victory` imported only in `components/charts/`; design tokens in `frontend/theme/`; mobile-responsive (narrow iframe).
 
-## Core
+## Commands
 
-- Local stack: `supabase start` (Docker), then `supabase migration up`; serve the function with `supabase functions serve text-to-sql --env-file supabase/functions/.env`.
-- Deno not installed on host; run `deno check/test/lint/fmt` via the `denoland/deno` Docker image.
-- Gemini: `gemini-3.1-flash-lite` default (`GEMINI_MODEL`), one retry on HTTP 429 with `gemini-3.5-flash-lite` (`GEMINI_FALLBACK_MODEL`, empty disables); free-tier quotas are per project and model, visible only in AI Studio. Via `generativelanguage.googleapis.com/v1beta`, key in `x-goog-api-key` header, `responseMimeType: application/json` + `responseSchema`.
+- Local: `supabase start`, `supabase migration up`, `supabase functions serve text-to-sql --env-file supabase/functions/.env` (also the `/prompt-regress` prerequisite; start it yourself via `!`).
+- No Deno on host: run `deno check/test/lint/fmt` via the `denoland/deno` Docker image.
 
 ## Design
 
-- Single-screen UI: PromptBar, PresetChips, ResultCanvas (kpi/bar/**trend line**/table, chosen by data shape in `frontend/lib/resultMapping.ts`); single-metric category bars take a ranked single-hue ramp, deepest at the top (darker in light, brighter in dark), contrast-clamped at the faint end (`barRamp` in `frontend/lib/color.ts`), SqlAccordion. Multi-series trends use a ranked colour ramp (`theme.trend.ramp`, assigned by average rank) and long-format results render a week-grouped, collapsible table. A long-format result carrying a rate plus its volume driver (ADR + rooms_sold, `PAIRS` in `resultMapping.ts`) renders as a `RateVolumePanel`: the selectable multi-line trend, then for the pinned (or only) property a `RateVolumeChart` combo (rooms-sold bars on a right axis, ADR line on the left). A category result with 2-3 metrics sharing a currency/percent unit (CPOR vs ADR by property, `groupSameUnit` in `resultMapping.ts`) renders a single `GroupedBarChart` (legend, flat hue per metric, no table). A category result carrying CSAT + NPS (`CATEGORY_COMBOS` in `resultMapping.ts`) renders a `ScoreComboChart` (CSAT % bars left, NPS line right). The "RevPAR vs occupancy" chip bypasses Gemini (`isRevparOccQuestion` in `lib/revparOcc.ts`), reads `daily_metrics` + `properties` via the anon client, runs the client-side engine `lib/revparEngine.ts` (Daily / 30 days / Annualised, demand-shift slider), and renders `RevparOccPanel` (stat cards, twin-panel RevPAR/occupancy chart with tier colouring, sortable leaderboard). Mobile-responsive (narrow iframe).
+Single screen: PromptBar, PresetChips, ResultCanvas, SqlAccordion. ResultCanvas picks kpi / bar / trend line / table by data shape (`frontend/lib/resultMapping.ts`):
+
+- Single-metric category bars: ranked single-hue ramp, deepest on top (darker in light, brighter in dark), contrast-clamped at the faint end (`barRamp`, `frontend/lib/color.ts`).
+- Multi-series trends: ranked ramp `theme.trend.ramp` assigned by average rank; long-format results get a week-grouped collapsible table.
+- Rate + volume driver (ADR + rooms_sold, `PAIRS`): `RateVolumePanel` = selectable multi-line trend, then `RateVolumeChart` combo for the pinned/only property (rooms-sold bars right axis, ADR line left).
+- 2–3 same-unit metrics by category (`groupSameUnit`, e.g. CPOR vs ADR): single `GroupedBarChart`, legend, flat hue per metric, no table.
+- CSAT + NPS by category (`CATEGORY_COMBOS`): `ScoreComboChart` (CSAT % bars left, NPS line right).
+- "RevPAR vs occupancy" chip bypasses Gemini (`isRevparOccQuestion`, `lib/revparOcc.ts`): reads `daily_metrics` + `properties` via the anon client, runs `lib/revparEngine.ts` (Daily / 30 days / Annualised, demand-shift slider), renders `RevparOccPanel` (stat cards, twin RevPAR/occupancy chart with tier colouring, sortable leaderboard).
 
 ## Claude Code automation
 
 - Hook `.claude/hooks/post-edit-check.sh` (PostToolUse Edit|Write): Deno fmt/check for the function, `tsc` + eslint for `frontend/`; exit 2 on failure.
-- Hookify rules (`.claude/hookify.*.local.md`): block `supabase db push|reset` and force push; warn on guard/prompt edits.
-- Skills: `/fn-test`, `/fn-deploy` (manual only), `/prompt-regress [--record]`.
-- Agents: `sql-guard-reviewer`, `chart-reviewer` (needs Expo dev server on :8081).
-- `/prompt-regress` prerequisite: start `supabase functions serve text-to-sql --env-file supabase/functions/.env` yourself via `!`.
+- Hookify (`.claude/hookify.*.local.md`): blocks `supabase db push|reset` and force push; warns on guard/prompt edits.
+- Skills: `/fn-test`, `/fn-deploy` (manual only), `/prompt-regress [--record]`. Agents: `sql-guard-reviewer`, `chart-reviewer` (needs Expo dev server on :8081).
 
-## **Always:**
+## Rules
 
-- Run linting and tests before committing
-- List only human authors in git commits
-
-## ⚠️ **Ask First:**
-
-- Before making database changes (schema, RLS policies, Supabase Functions)
-- Before pushing database changes
-
-## ❌ **Never:**
-
-- Force push to main
-- Use `supabase db push`
-- Use `supabase db reset`
-- Commit secrets or .env files to the repository
+- **Always:** lint and test before committing; human authors only in commits.
+- **Ask first:** database changes (schema, RLS, Edge Functions) and pushing them.
+- **Never:** force push to main; `supabase db push`; `supabase db reset`; commit secrets or `.env` files.
