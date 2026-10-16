@@ -16,7 +16,7 @@ import { fonts } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
 import { truncateLabel, wrapLabel } from "./rows";
-import { niceCeil, tickLabel } from "./scale";
+import { axisScale, tickLabel } from "./scale";
 
 const PAD = { top: 10, bottom: 34, left: 58, right: 58 };
 const NARROW_PAD = { left: 64, right: 48, bottom: 88 };
@@ -34,23 +34,6 @@ const INTERVALS = 4;
 const TICKS = Array.from({ length: INTERVALS + 1 }, (_, i) => (i * 100) / INTERVALS);
 
 type BarDatum = { x: number; y: number; y0: number; i: number };
-
-/**
- * Round axis with exactly INTERVALS steps. `lo` is a multiple of the final step, so zero always falls on
- * a gridline, and two axes share one grid.
- */
-function axisScale(values: number[]): { lo: number; hi: number } {
-  const min = Math.min(0, ...values);
-  const max = Math.max(0, ...values);
-  let step = niceCeil((max - min) / INTERVALS);
-  let lo = Math.floor(min / step) * step;
-  // Flooring lo can leave the top short of max; widen to the next round step until it fits.
-  while (lo + step * INTERVALS < max - step * 1e-9) {
-    step = niceCeil(step * 1.01);
-    lo = Math.floor(min / step) * step;
-  }
-  return { lo, hi: lo + step * INTERVALS };
-}
 
 /** Bars on the left axis, line on the right; each axis is normalised to a shared 0..100 grid. */
 export function DualAxisChart({ series }: { series: DualAxisSeries }) {

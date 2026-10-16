@@ -40,3 +40,20 @@ export function niceDomain(
   for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Number(v.toFixed(10)));
   return { lo, hi, ticks };
 }
+
+/**
+ * Round axis with exactly `intervals` steps. `lo` is a multiple of the final step, so zero always falls on
+ * a gridline, and two axes share one grid.
+ */
+export function axisScale(values: number[], intervals = 4): { lo: number; hi: number } {
+  const min = Math.min(0, ...values);
+  const max = Math.max(0, ...values);
+  let step = niceCeil((max - min) / intervals);
+  let lo = Math.floor(min / step) * step;
+  // Flooring lo can leave the top short of max; widen to the next round step until it fits.
+  while (lo + step * intervals < max - step * 1e-9) {
+    step = niceCeil(step * 1.01);
+    lo = Math.floor(min / step) * step;
+  }
+  return { lo, hi: lo + step * intervals };
+}
