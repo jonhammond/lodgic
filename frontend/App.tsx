@@ -376,7 +376,7 @@ function AppInner() {
                     <GroupedBarChart key={s.key} series={s} />
                   ) : s.kind === "combo" ? (
                     <ScoreComboChart key={s.key} series={s} />
-                  ) : (
+                  ) : s.kind === "scatter" || s.kind === "pie" || s.kind === "stacked" || s.kind === "dual" ? null : (
                     <MetricBarChart key={s.key} series={s} />
                   ),
                 )}

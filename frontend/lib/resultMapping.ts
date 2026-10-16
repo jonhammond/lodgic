@@ -13,8 +13,10 @@ import {
   monthLabel,
   toNumber,
   unitLabel,
-} from "../components/charts/format";
+} from "../components/charts/format.ts";
 import type { QueryResult } from "./api";
+import { explicitFacts, mapExplicit } from "./explicitCharts.ts";
+import type { DualAxisSeries, PieSeries, ScatterSeries, StackedSeries } from "./explicitCharts.ts";
 
 export type MetricUnit = "currency" | "percent" | "index" | "number";
 export type ColorKey =
@@ -80,7 +82,7 @@ export type ComboSeries = {
 export type MappedResult = {
   headline: string;
   facts: string[];
-  charts: (MetricSeries | TrendSeries | GroupedSeries | ComboSeries)[];
+  charts: (MetricSeries | TrendSeries | GroupedSeries | ComboSeries | ScatterSeries | PieSeries | StackedSeries | DualAxisSeries)[];
   pair: RateVolumePair | null;
   table: {
     columns: string[];
@@ -92,7 +94,7 @@ export type MappedResult = {
 
 const COLORS: ColorKey[] = ["revenue", "adr", "revpar", "occupancy"];
 
-function colorFor(key: string, i: number): ColorKey {
+export function colorFor(key: string, i: number): ColorKey {
   if (/revpar/i.test(key)) return "revpar";
   if (/occ/i.test(key)) return "occupancy";
   if (/adr|rate/i.test(key)) return "adr";
@@ -106,7 +108,7 @@ function colorFor(key: string, i: number): ColorKey {
 
 const INDEX_RE = /(^|[^a-z])(mpi|ari|rgi)([^a-z]|$)|index/i;
 
-function unitFor(key: string): MetricUnit {
+export function unitFor(key: string): MetricUnit {
   if (INDEX_RE.test(key)) return "index";
   if (/pct|percent|ratio|share/i.test(key)) return "percent";
   if (/revenue|adr|revpar|price|cost|cpor|gop|income/i.test(key)) return "currency";
@@ -330,6 +332,13 @@ export function mapResult(result: QueryResult, now: Date = new Date()): MappedRe
   const { rows, chart, title } = result;
   const empty: MappedResult = { headline: title, facts: [], charts: [], pair: null, table: null };
   if (rows.length === 0) return empty;
+
+  if (result.chart_spec) {
+    const ex = mapExplicit(result);
+    if (ex) {
+      return { headline: title, facts: explicitFacts(ex), charts: [ex], pair: null, table: { columns: Object.keys(rows[0]), rows } };
+    }
+  }
 
   if (chart === "kpi") {
     if (rows.length !== 1) return empty;

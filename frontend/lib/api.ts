@@ -1,9 +1,18 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
+/** Column mapping for scatter | pie | combo | stacked_bar; validated server-side against rows[0]. */
+export type ChartSpec = {
+  x: string;
+  y: string[];
+  y2?: string | null;
+  label?: string | null;
+};
+
 export type QueryResult = {
   sql: string;
-  chart: "bar" | "line" | "kpi" | "table";
+  chart: "bar" | "line" | "kpi" | "table" | "scatter" | "pie" | "combo" | "stacked_bar";
+  chart_spec?: ChartSpec | null;
   title: string;
   rows: Record<string, unknown>[];
   caveat?: string | null;
