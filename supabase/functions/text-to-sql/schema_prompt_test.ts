@@ -17,6 +17,15 @@ Deno.test("every metric column appears in the system prompt", () => {
   }
 });
 
+Deno.test("every metric column is documented in docs/metrics-glossary.md", async () => {
+  const doc = await Deno.readTextFile(
+    new URL("../../../docs/metrics-glossary.md", import.meta.url),
+  );
+  for (const col of METRIC_COLUMNS) {
+    assert(doc.includes("`" + col + "`"), `missing column in glossary: ${col}`);
+  }
+});
+
 Deno.test("prompt retains SQL formatting rules", () => {
   assert(SYSTEM_PROMPT.includes("semicolon"), "missing semicolon rule");
   assert(SYSTEM_PROMPT.includes("double quotes"), "missing double quotes rule");
