@@ -28,27 +28,35 @@ type Metric = "csat" | "nps";
 type Scope = "hotel" | "segment" | "portfolio";
 type SeriesDef = { key: string; metric: Metric; scope: Scope; legend: string; tip: string; values: (number | null)[] };
 
-const DASH: Record<Scope, string | undefined> = { hotel: undefined, segment: "6,4", portfolio: "2,3" };
-const WIDTH: Record<Scope, number> = { hotel: 2.5, segment: 2, portfolio: 1.5 };
+// Scope sets the dash and weight; metric sets the hue. CSAT is stored 1-5 and plotted as percent of 5 (scale 20).
+const SCOPES: { scope: Scope; dash?: string; width: number; border: "solid" | "dashed" | "dotted" }[] = [
+  { scope: "hotel", width: 2.5, border: "solid" },
+  { scope: "segment", dash: "6,4", width: 2, border: "dashed" },
+  { scope: "portfolio", dash: "2,3", width: 1.5, border: "dotted" },
+];
+const METRICS: { metric: Metric; label: string; scale: number; dp: number }[] = [
+  { metric: "csat", label: "CSAT", scale: 20, dp: 2 },
+  { metric: "nps", label: "NPS", scale: 1, dp: 1 },
+];
+const scopeStyle = (scope: Scope) => SCOPES.find((x) => x.scope === scope) ?? SCOPES[0];
+const yPx = (v: number, top: number, lo: number, hi: number) => top + ((hi - v) / (hi - lo)) * PLOT_H;
 
 /** `yyyy-mm-dd` becomes `d MMM`; other labels (e.g. `Sep 2026`) pass through. */
 export function guestTrendLabel(label: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(label) ? `${Number(label.slice(8, 10))} ${monthLabel(label)}` : label;
 }
 
-const round = (v: number | null, dp: number): number | "" => (v === null ? "" : Number(v.toFixed(dp)));
-
 /** One row per bucket for CSV export. CSAT stays on the engine's 1-5 scale; empty string marks a gap. */
 export function guestTrendCsvRows(trend: GuestTrend): Record<string, unknown>[] {
-  return trend.labels.map((period, i) => ({
-    period,
-    hotel_csat: round(trend.hotel.csat[i] ?? null, 2),
-    hotel_nps: round(trend.hotel.nps[i] ?? null, 1),
-    segment_csat: round(trend.segment.csat[i] ?? null, 2),
-    segment_nps: round(trend.segment.nps[i] ?? null, 1),
-    portfolio_csat: round(trend.portfolio.csat[i] ?? null, 2),
-    portfolio_nps: round(trend.portfolio.nps[i] ?? null, 1),
-  }));
+  return trend.labels.map((period, i) => {
+    const row: Record<string, unknown> = { period };
+    for (const { scope } of SCOPES)
+      for (const { metric, dp } of METRICS) {
+        const v = trend[scope][metric][i] ?? null;
+        row[`${scope}_${metric}`] = v === null ? "" : Number(v.toFixed(dp));
+      }
+    return row;
+  });
 }
 
 type Props = {
@@ -77,15 +85,17 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
   const hue: Record<Metric, string> = { csat: t.kpi.guest.line, nps: t.kpi.market.line };
 
   const series = useMemo<SeriesDef[]>(() => {
-    const pct = (vs: (number | null)[]) => vs.map((v) => (v === null ? null : v * 20));
-    return [
-      { key: "hotel-csat", metric: "csat", scope: "hotel", legend: "Hotel CSAT %", tip: `${hotelName} CSAT`, values: pct(trend.hotel.csat) },
-      { key: "hotel-nps", metric: "nps", scope: "hotel", legend: "Hotel NPS", tip: `${hotelName} NPS`, values: trend.hotel.nps },
-      { key: "seg-csat", metric: "csat", scope: "segment", legend: `${segmentLabel} CSAT avg`, tip: `${segmentLabel} CSAT`, values: pct(trend.segment.csat) },
-      { key: "seg-nps", metric: "nps", scope: "segment", legend: `${segmentLabel} NPS avg`, tip: `${segmentLabel} NPS`, values: trend.segment.nps },
-      { key: "port-csat", metric: "csat", scope: "portfolio", legend: "Portfolio CSAT avg", tip: "Portfolio CSAT", values: pct(trend.portfolio.csat) },
-      { key: "port-nps", metric: "nps", scope: "portfolio", legend: "Portfolio NPS avg", tip: "Portfolio NPS", values: trend.portfolio.nps },
-    ];
+    const names: Record<Scope, string> = { hotel: hotelName, segment: segmentLabel, portfolio: "Portfolio" };
+    return SCOPES.flatMap(({ scope }) =>
+      METRICS.map(({ metric, label, scale }) => ({
+        key: `${scope}-${metric}`,
+        metric,
+        scope,
+        legend: scope === "hotel" ? `Hotel ${label}${metric === "csat" ? " %" : ""}` : `${names[scope]} ${label} avg`,
+        tip: `${names[scope]} ${label}`,
+        values: trend[scope][metric].map((v) => (v === null ? null : v * scale)),
+      })),
+    );
   }, [trend, hotelName, segmentLabel]);
 
   // 0-100 axis; extends below 0 (or above 100) only when the data does.
@@ -96,8 +106,6 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
 
   const xTicks = pickTickValues(labels.map(guestTrendLabel), plotW, X_TICK_FONT);
   const tickLabels = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
-  const plotH = PLOT_H;
-  const yPx = (v: number) => pad.top + ((hi - v) / (hi - lo)) * plotH;
 
   // End labels for the hotel lines only; nudged apart when they would collide.
   const ends = useMemo(() => {
@@ -109,9 +117,10 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
         return i < 0 ? null : { s, x: i + 1, y: s.values[i] as number, dy: 0 };
       })
       .filter((e): e is NonNullable<typeof e> => e !== null);
-    if (out.length === 2) {
+    // Only labels sharing an x can collide.
+    if (out.length === 2 && out[0].x === out[1].x) {
       const [a, b] = out[0].y >= out[1].y ? [out[0], out[1]] : [out[1], out[0]];
-      const gap = yPx(b.y) - yPx(a.y);
+      const gap = yPx(b.y, PAD.top, lo, hi) - yPx(a.y, PAD.top, lo, hi);
       if (gap < END_LABEL_MIN_GAP) {
         const shift = (END_LABEL_MIN_GAP - gap) / 2;
         a.dy = -shift;
@@ -119,7 +128,6 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
       }
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [series, lo, hi]);
 
   const fmt = (s: SeriesDef, v: number) => (s.metric === "csat" ? `${Math.round(v)}%` : String(Math.round(v)));
@@ -156,9 +164,9 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
               style={{
                 width: 16,
                 height: 0,
-                borderTopWidth: WIDTH[s.scope],
+                borderTopWidth: scopeStyle(s.scope).width,
                 borderTopColor: hue[s.metric],
-                borderStyle: s.scope === "hotel" ? "solid" : s.scope === "segment" ? "dashed" : "dotted",
+                borderStyle: scopeStyle(s.scope).border,
               }}
             />
             <Text style={[styles.legendText, { color: t.text.secondary }]}>{s.legend}</Text>
@@ -229,8 +237,8 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
                   style={{
                     data: {
                       stroke: hue[s.metric],
-                      strokeWidth: WIDTH[s.scope],
-                      strokeDasharray: DASH[s.scope],
+                      strokeWidth: scopeStyle(s.scope).width,
+                      strokeDasharray: scopeStyle(s.scope).dash,
                       strokeLinejoin: "round",
                       strokeLinecap: "round",
                       opacity: p.faded ? PARTIAL_OPACITY : 1,
@@ -245,7 +253,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
                 <VictoryScatter
                   key={`m-${s.key}`}
                   name={`m-${s.key}`}
-                  data={s.values.map((y, i) => ({ x: i + 1, y }))}
+                  data={s.values.flatMap((y, i) => (y === null ? [] : [{ x: i + 1, y }]))}
                   size={3}
                   style={{
                     data: {
@@ -328,7 +336,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
               const v = s.values[hoverIdx - 1];
               return (
                 <View key={s.key} style={styles.tipRow}>
-                  <View style={[styles.tipKey, { backgroundColor: hue[s.metric], height: s.scope === "hotel" ? 3 : 2 }]} />
+                  <View style={[styles.tipKey, { backgroundColor: hue[s.metric], height: Math.ceil(scopeStyle(s.scope).width) }]} />
                   <Text style={[styles.tipName, { color: t.text.secondary }]} numberOfLines={1}>
                     {s.tip}
                   </Text>
