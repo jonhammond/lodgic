@@ -28,12 +28,15 @@ import { QuestionPanel } from "./components/QuestionPanel";
 import { ResultBlock } from "./components/ResultBlock";
 import { PropertyPicker } from "./components/PropertyPicker";
 import { Rail } from "./components/Rail";
+import { NpsCsatPanel } from "./components/guest";
 import { RevparOccPanel } from "./components/revpar/RevparOccPanel";
 import { QueryError, QueryResult, runQuery } from "./lib/api";
 import { downloadCsv } from "./lib/csv";
 import { fetchKpis, KpiSnapshot } from "./lib/kpis";
 import { fetchProperties, Property } from "./lib/properties";
+import { isNpsCsatQuestion } from "./lib/npsCsat";
 import { isRevparOccQuestion } from "./lib/revparOcc";
+import type { Timeframe } from "./lib/revparEngine";
 import { mapResult } from "./lib/resultMapping";
 import { readStored, writeStored } from "./lib/storage";
 import { space } from "./theme/tokens";
@@ -46,7 +49,8 @@ type State = {
   status: Status;
   errorMessage: string | null;
   result: QueryResult | null;
-  panel: "revparOcc" | null;
+  panel: "revparOcc" | "npsCsat" | null;
+  panelTimeframe: Timeframe;
   panelSeq: number;
   sqlOpen: boolean;
   kpis: { status: "loading" | "ready" | "error"; data: KpiSnapshot | null };
@@ -59,7 +63,7 @@ type State = {
 type Action =
   | { type: "SET_QUESTION"; question: string }
   | { type: "SUBMIT" }
-  | { type: "OPEN_PANEL" }
+  | { type: "OPEN_PANEL"; panel: "revparOcc" | "npsCsat"; timeframe?: Timeframe }
   | { type: "SUCCESS"; result: QueryResult }
   | { type: "FAIL"; message: string; code?: string }
   | { type: "TOGGLE_SQL" }
@@ -91,6 +95,7 @@ const initial: State = {
   errorMessage: null,
   result: null,
   panel: null,
+  panelTimeframe: "mtd",
   panelSeq: 0,
   sqlOpen: false,
   kpis: { status: "loading", data: null },
@@ -107,7 +112,7 @@ function reducer(s: State, a: Action): State {
     case "SUBMIT":
       return { ...s, status: "loading", errorMessage: null, panel: null };
     case "OPEN_PANEL":
-      return { ...s, status: "idle", errorMessage: null, result: null, panel: "revparOcc", panelSeq: s.panelSeq + 1 };
+      return { ...s, status: "idle", errorMessage: null, result: null, panel: a.panel, panelTimeframe: a.timeframe ?? "mtd", panelSeq: s.panelSeq + 1 };
     case "SUCCESS":
       return { ...s, status: "idle", errorMessage: null, result: a.result, panel: null };
     case "FAIL":
@@ -179,7 +184,7 @@ function AppInner() {
     IBMPlexMono_500Medium,
   });
   const [state, dispatch] = useReducer(reducer, initial);
-  const { question, status, errorMessage, result, panel, panelSeq, sqlOpen, kpis } = state;
+  const { question, status, errorMessage, result, panel, panelTimeframe, panelSeq, sqlOpen, kpis } = state;
   const [panelExport, setPanelExport] = useState<{
     rows: Record<string, unknown>[];
     filename: string;
@@ -258,7 +263,12 @@ function AppInner() {
     }
     dispatch({ type: "SET_QUESTION", question: text });
     if (isRevparOccQuestion(text)) {
-      dispatch({ type: "OPEN_PANEL" });
+      dispatch({ type: "OPEN_PANEL", panel: "revparOcc" });
+      return;
+    }
+    const tf = isNpsCsatQuestion(text);
+    if (tf) {
+      dispatch({ type: "OPEN_PANEL", panel: "npsCsat", timeframe: tf });
       return;
     }
     dispatch({ type: "SUBMIT" });
@@ -321,7 +331,15 @@ function AppInner() {
             resultY.current = y;
           }}
         >
-          {panel ? (
+          {panel === "npsCsat" ? (
+            <NpsCsatPanel
+              key={panelSeq}
+              properties={properties}
+              selectedIds={selectedIds}
+              initialTimeframe={panelTimeframe}
+              onRowsChange={onPanelRows}
+            />
+          ) : panel ? (
             <RevparOccPanel
               key={panelSeq}
               properties={properties}
