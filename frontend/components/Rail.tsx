@@ -51,7 +51,7 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
           { backgroundColor: hoverable(state) ? t.accent.blueHover : t.accent.blue },
         ]}
       >
-        <BuildingIcon size={22} color={t.text.onAccent} />
+        <BuildingIcon size={28} color={t.text.onAccent} />
         <View style={[styles.badge, { backgroundColor: t.accent.pink }]}>
           <Text style={styles.badgeText}>{selectedCount}</Text>
         </View>
@@ -63,7 +63,7 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
         accessibilityLabel={scheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         style={(state) => [styles.block, block, { backgroundColor: toggleBg, opacity: hoverable(state) ? 0.85 : 1 }]}
       >
-        <Ionicons name={scheme === "dark" ? "sunny" : "moon"} size={18} color={t.text.onAccent} />
+        <Ionicons name={scheme === "dark" ? "sunny" : "moon"} size={24} color={t.text.onAccent} />
       </Pressable>
     </View>
   );
