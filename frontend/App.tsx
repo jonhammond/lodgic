@@ -14,10 +14,14 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { Platform, ScrollView, View } from "react-native";
 import { AnswerCard } from "./components/AnswerCard";
 import { CategoryBarChart } from "./components/charts/CategoryBarChart";
+import { DualAxisChart } from "./components/charts/DualAxisChart";
 import { GroupedBarChart } from "./components/charts/GroupedBarChart";
 import { MetricBarChart } from "./components/charts/MetricBarChart";
+import { PieChart } from "./components/charts/PieChart";
 import { RateVolumePanel } from "./components/charts/RateVolumePanel";
+import { ScatterChart } from "./components/charts/ScatterChart";
 import { ScoreComboChart } from "./components/charts/ScoreComboChart";
+import { StackedBarChart } from "./components/charts/StackedBarChart";
 import { TrendLineChart } from "./components/charts/TrendLineChart";
 import { Footer } from "./components/Footer";
 import { Grid } from "./components/Grid";
@@ -366,7 +370,11 @@ function AppInner() {
             />
             {mapped?.pair ? <RateVolumePanel key={resultSeq} pair={mapped.pair} /> : null}
             {mapped && mapped.charts.length > 0 ? (
-              <Grid minWidth={mapped.charts.some((s) => s.kind === "trend" || s.kind === "combo") ? 480 : 280}>
+              <Grid
+                minWidth={
+                  mapped.charts.some((s) => ["trend", "combo", "scatter", "dual", "stacked"].includes(s.kind)) ? 480 : 280
+                }
+              >
                 {mapped.charts.map((s) =>
                   s.kind === "trend" ? (
                     <TrendLineChart key={s.key} series={s} />
@@ -376,7 +384,15 @@ function AppInner() {
                     <GroupedBarChart key={s.key} series={s} />
                   ) : s.kind === "combo" ? (
                     <ScoreComboChart key={s.key} series={s} />
-                  ) : s.kind === "scatter" || s.kind === "pie" || s.kind === "stacked" || s.kind === "dual" ? null : (
+                  ) : s.kind === "scatter" ? (
+                    <ScatterChart key={s.key} series={s} />
+                  ) : s.kind === "pie" ? (
+                    <PieChart key={s.key} series={s} />
+                  ) : s.kind === "stacked" ? (
+                    <StackedBarChart key={s.key} series={s} />
+                  ) : s.kind === "dual" ? (
+                    <DualAxisChart key={s.key} series={s} />
+                  ) : (
                     <MetricBarChart key={s.key} series={s} />
                   ),
                 )}
