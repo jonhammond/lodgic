@@ -1,4 +1,4 @@
-import { dateAxisLabels, humanize, isDateLike } from "../components/charts/format.ts";
+import { axisTitle, dateAxisLabels, humanize, isDateLike, metricLabel } from "../components/charts/format.ts";
 import type { QueryResult } from "./api.ts";
 import { colorFor, formatByUnit, unitFor } from "./resultMapping.ts";
 import type { ColorKey, MetricUnit } from "./resultMapping.ts";
@@ -10,12 +10,31 @@ export type ScatterSeries = {
   kind: "scatter";
   key: string;
   title: string;
+  /** Bare metric names (tooltip, facts). */
   xLabel: string;
   yLabel: string;
+  /** Axis titles with unit suffix. */
+  xTitle: string;
+  yTitle: string;
   xUnit: Unit;
   yUnit: Unit;
-  points: { label: string; x: number; y: number }[];
+  points: { label: string; x: number; y: number; quadrant: Quadrant }[];
 };
+
+export type Quadrant = "strong" | "weak" | "pricey" | "busy";
+
+const median = (v: number[]): number => {
+  const s = [...v].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/** Quadrant at the medians (ties count as high): strong = high x and y, weak = both low, pricey = high x only, busy = high y only. */
+export function quadrantOf(x: number, y: number, mx: number, my: number): Quadrant {
+  const hx = x >= mx;
+  const hy = y >= my;
+  return hx && hy ? "strong" : !hx && !hy ? "weak" : hx ? "pricey" : "busy";
+}
 
 export type PieSeries = {
   kind: "pie";
@@ -103,20 +122,25 @@ function autoLabelKey(first: Row, skip: string[]): string | undefined {
 
 function mapScatter(rows: Row[], title: string, x: string, y: string, labelKey: string | null | undefined): ScatterSeries | null {
   const textKey = labelKey ?? autoLabelKey(rows[0], [x, y]);
-  const points: ScatterSeries["points"] = [];
+  const raw: { label: string; x: number; y: number }[] = [];
   rows.forEach((r, i) => {
     const px = num(r[x]);
     const py = num(r[y]);
     if (px === null || py === null) return;
-    points.push({ label: textKey === undefined ? String(i + 1) : labelOf(r, textKey) || String(i + 1), x: px, y: py });
+    raw.push({ label: textKey === undefined ? String(i + 1) : labelOf(r, textKey) || String(i + 1), x: px, y: py });
   });
-  if (points.length < SCATTER_MIN_POINTS) return null;
+  if (raw.length < SCATTER_MIN_POINTS) return null;
+  const mx = median(raw.map((p) => p.x));
+  const my = median(raw.map((p) => p.y));
+  const points = raw.map((p) => ({ ...p, quadrant: quadrantOf(p.x, p.y, mx, my) }));
   return {
     kind: "scatter",
     key: `${x}:${y}`,
     title,
-    xLabel: humanize(x),
-    yLabel: humanize(y),
+    xLabel: metricLabel(x),
+    yLabel: metricLabel(y),
+    xTitle: axisTitle(x, unitFor(x)),
+    yTitle: axisTitle(y, unitFor(y)),
     xUnit: unitFor(x),
     yUnit: unitFor(y),
     points,

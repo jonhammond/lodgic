@@ -61,3 +61,11 @@ test("ensureContrast lifts every trend ramp colour to 3:1 on the card and leaves
   }
   assert.equal(ensureContrast("#000000", "#ffffff", "light"), "#000000");
 });
+
+test("quadrant colours reach 3:1 on the card in both palettes", () => {
+  for (const [scheme, t] of [["light", light], ["dark", dark]] as const) {
+    for (const [k, c] of Object.entries(t.quadrant)) {
+      assert.ok(contrast(c, t.bg.card) >= 3, `${scheme} ${k} ${c} = ${contrast(c, t.bg.card)}`);
+    }
+  }
+});

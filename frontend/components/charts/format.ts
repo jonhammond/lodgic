@@ -85,6 +85,18 @@ export function humanize(key: string): string {
     .join(" ");
 }
 
+/** Bare metric name: humanized key with a trailing _pct/_percent/_percentage/_ratio dropped. */
+export function metricLabel(key: string): string {
+  return humanize(key.replace(/_(pct|percent|percentage|ratio)$/i, ""));
+}
+
+const UNIT_SUFFIX = { currency: " ($)", percent: " (%)", index: " (index)", number: "" } as const;
+
+/** Axis title: metric name plus unit suffix. */
+export function axisTitle(key: string, unit: keyof typeof UNIT_SUFFIX): string {
+  return metricLabel(key) + UNIT_SUFFIX[unit];
+}
+
 /** Short unit tag for chart notes: "%" rather than "percent". */
 export function unitLabel(unit: "currency" | "percent" | "index" | "number"): string {
   return unit === "percent" ? "%" : unit === "currency" ? "USD" : unit;

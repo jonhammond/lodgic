@@ -46,6 +46,7 @@ export type Palette = {
   };
   delta: { up: string; down: string; error: string };
   tier: { above: string; below: string; critical: string };
+  quadrant: { strong: string; weak: string; pricey: string; busy: string };
   kpi: Record<
     "revenue" | "adr" | "revpar" | "occupancy" | "distribution" | "cost" | "market" | "guest",
     KpiColors
@@ -128,6 +129,7 @@ export const dark: Palette = {
   },
   delta: { up: "#7fe0b4", down: "#ff8fa8", error: "#ff8fa8" },
   tier: { above: accents.violet, below: "#6b7d90", critical: "#ff8fa8" },
+  quadrant: { strong: "#34c98a", weak: "#ff8fa8", pricey: "#e0a526", busy: "#62b4f0" },
   kpi: {
     ...kpi,
     revenue: { line: accents.blueFocus, glow: "#4c7dd9bf", bar: accents.blueFocus, barPartial: "#4c7dd98c" },
@@ -185,6 +187,7 @@ export const light: Palette = {
   },
   delta: { up: "#0f8a5a", down: "#c4204f", error: "#c4204f" },
   tier: { above: "#7b57c8", below: "#7f8c98", critical: "#c4204f" },
+  quadrant: { strong: "#0f8a5a", weak: "#c4204f", pricey: "#b07f12", busy: "#1f6fb8" },
   kpi: {
     ...kpi,
     revpar: { line: "#7b57c8", glow: "#7b57c880", bar: "#7b57c8", barPartial: "#7b57c88c" },

@@ -8,9 +8,9 @@ import {
   VictoryTooltip,
   VictoryVoronoiContainer,
 } from "victory";
-import { barRamp, denseRankDesc } from "../../lib/color";
 import { formatByUnit } from "../../lib/resultMapping";
-import type { ScatterSeries } from "../../lib/explicitCharts";
+import type { Quadrant, ScatterSeries } from "../../lib/explicitCharts";
+import { placeLabels } from "../../lib/scatterLabels";
 import { fonts } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
 import { Card } from "../Card";
@@ -21,17 +21,23 @@ const PAD_NARROW = { ...PAD, left: 62, right: 14 };
 const NARROW_W = 360;
 const LABEL_MIN_W = 480;
 const LABEL_MAX_POINTS = 10;
-const EDGE_FRAC = 0.15;
-const LABEL_CLASH_W = 100; // px: two labels closer than this horizontally…
-const LABEL_CLASH_H = 16; // …and vertically would overlap
-const LABEL_DY_ABOVE = -12;
-const LABEL_DY_BELOW = 16; // labels this close to a domain edge anchor inward instead of centring
+const DOMAIN_PAD = 10;
 
-type Datum = { x: number; y: number; label: string; fill: string; dy?: number };
+type Datum = {
+  x: number;
+  y: number;
+  name: string;
+  quadrant: Quadrant;
+  fill: string;
+  dx?: number;
+  dy?: number;
+  anchor?: "start" | "middle" | "end";
+  hidden?: boolean;
+};
 
-/** Two-metric correlation: one point per category, shaded by y-rank. */
+/** Two-metric correlation: one point per category, coloured by quadrant at the medians. */
 export function ScatterChart({ series }: { series: ScatterSeries }) {
-  const { t, scheme } = useTheme();
+  const { t } = useTheme();
   const [width, setWidth] = useState(0);
   const { points, xUnit, yUnit } = series;
   const n = points.length;
@@ -40,33 +46,34 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
   const height = Math.round(Math.min(360, Math.max(240, width * 0.6)));
   const xd = niceDomain(Math.min(...points.map((p) => p.x)), Math.max(...points.map((p) => p.x)), 4);
   const yd = niceDomain(Math.min(...points.map((p) => p.y)), Math.max(...points.map((p) => p.y)), 4);
-  const ranks = denseRankDesc(points.map((p) => p.y));
-  const ramp = barRamp(t.kpi.market.bar, t.bg.card, scheme, ranks.length ? Math.max(...ranks) + 1 : 0);
-  const data: Datum[] = points.map((p, i) => ({ x: p.x, y: p.y, label: p.label, fill: ramp[ranks[i]] }));
+  const data: Datum[] = points.map((p) => ({ x: p.x, y: p.y, name: p.label, quadrant: p.quadrant, fill: t.quadrant[p.quadrant] }));
   const named = n <= LABEL_MAX_POINTS && width >= LABEL_MIN_W;
   const xSpan = xd.hi - xd.lo || 1;
-  const nameAnchor = ({ datum }: { datum?: Datum }) => {
-    const f = datum ? (datum.x - xd.lo) / xSpan : 0.5;
-    return f > 1 - EDGE_FRAC ? "end" : f < EDGE_FRAC ? "start" : "middle";
-  };
-  // Labels default above the point; a point whose label would overlap an earlier (by x) point's
-  // label drops below its point instead. Stored on the datum because Victory clones data objects.
   const ySpan = yd.hi - yd.lo || 1;
   const plotW = Math.max(1, width - pad.left - pad.right);
   const plotH = Math.max(1, height - pad.top - pad.bottom);
-  const px = (p: Datum) => ((p.x - xd.lo) / xSpan) * plotW;
-  const py = (p: Datum) => ((yd.hi - p.y) / ySpan) * plotH;
-  for (const i of data.map((_, k) => k).sort((a, b) => data[a].x - data[b].x)) {
-    const d = data[i];
-    const clash = data.some(
-      (o) =>
-        o !== d &&
-        o.dy === LABEL_DY_ABOVE &&
-        Math.abs(px(d) - px(o)) < LABEL_CLASH_W &&
-        Math.abs(py(d) - py(o)) < LABEL_CLASH_H,
+  if (named) {
+    // Placement is stored on the datum because Victory clones data objects.
+    const placed = placeLabels(
+      data.map((d) => ({
+        px: DOMAIN_PAD + ((d.x - xd.lo) / xSpan) * (plotW - 2 * DOMAIN_PAD),
+        py: DOMAIN_PAD + ((yd.hi - d.y) / ySpan) * (plotH - 2 * DOMAIN_PAD),
+        name: d.name,
+      })),
+      plotW,
+      plotH,
     );
-    d.dy = clash ? LABEL_DY_BELOW : LABEL_DY_ABOVE;
+    placed.forEach((pl, i) => {
+      if (pl) Object.assign(data[i], { dx: pl.dx, dy: pl.dy, anchor: pl.anchor });
+      else data[i].hidden = true;
+    });
   }
+  const legendItems = [
+    { key: "strong", text: `High ${series.xLabel}, high ${series.yLabel}` },
+    { key: "weak", text: `Low ${series.xLabel}, low ${series.yLabel}` },
+    { key: "pricey", text: `High ${series.xLabel}, low ${series.yLabel}` },
+    { key: "busy", text: `Low ${series.xLabel}, high ${series.yLabel}` },
+  ] as const;
   const tick = { fontFamily: fonts.mono400, fontSize: 10, fill: t.text.tick, padding: 6 };
   const axisLabel = { fontFamily: fonts.sans400, fontSize: 11, fill: t.text.dim };
 
@@ -88,7 +95,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
             <VictoryAxis
               tickValues={narrow ? [xd.lo, xd.hi] : xd.ticks}
               tickFormat={(v: number) => tickLabel(v, xUnit)}
-              label={series.xLabel}
+              label={series.xTitle}
               axisLabelComponent={<VictoryLabel dy={8} />}
               style={{
                 axis: { stroke: t.border.axis, strokeWidth: 1 },
@@ -102,7 +109,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
               dependentAxis
               tickValues={yd.ticks}
               tickFormat={(v: number) => tickLabel(v, yUnit)}
-              label={series.yLabel}
+              label={series.yTitle}
               axisLabelComponent={<VictoryLabel />}
               style={{
                 axis: { stroke: "transparent" },
@@ -117,7 +124,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
               data={data}
               size={6}
               labels={({ datum }) => [
-                (datum as Datum).label,
+                (datum as Datum).name,
                 `${series.xLabel} ${formatByUnit((datum as Datum).x, xUnit)}`,
                 `${series.yLabel} ${formatByUnit((datum as Datum).y, yUnit)}`,
               ]}
@@ -133,7 +140,7 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
               }
               style={{
                 data: {
-                  fill: ({ datum }: { datum?: Datum }) => datum?.fill ?? t.kpi.market.bar,
+                  fill: ({ datum }: { datum?: Datum }) => datum?.fill ?? t.quadrant.strong,
                   stroke: t.bg.card,
                   strokeWidth: 1.5,
                 },
@@ -144,11 +151,12 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
                 name="names"
                 data={data}
                 size={0}
-                labels={({ datum }) => (datum as Datum).label}
+                labels={({ datum }) => ((datum as Datum).hidden ? "" : (datum as Datum).name)}
                 labelComponent={
                   <VictoryLabel
-                    dy={({ datum }: { datum?: Datum }) => datum?.dy ?? LABEL_DY_ABOVE}
-                    textAnchor={nameAnchor}
+                    dx={({ datum }: { datum?: Datum }) => datum?.dx ?? 0}
+                    dy={({ datum }: { datum?: Datum }) => datum?.dy ?? -12}
+                    textAnchor={({ datum }: { datum?: Datum }) => datum?.anchor ?? "middle"}
                   />
                 }
                 style={{
@@ -159,6 +167,14 @@ export function ScatterChart({ series }: { series: ScatterSeries }) {
             )}
           </VictoryChart>
         )}
+      </View>
+      <View style={styles.legend}>
+        {legendItems.map((it) => (
+          <View key={it.key} style={styles.legendItem}>
+            <View style={[styles.key, { backgroundColor: t.quadrant[it.key] }]} />
+            <Text style={[styles.legendText, { color: t.text.secondary }]}>{it.text}</Text>
+          </View>
+        ))}
       </View>
     </Card>
   );
@@ -173,4 +189,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: { fontFamily: fonts.sans700, fontSize: 13, flexShrink: 1 },
+  legend: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 2, marginTop: 10 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
+  key: { width: 10, height: 10, borderRadius: 5 },
+  legendText: { fontFamily: fonts.sans400, fontSize: 11 },
 });

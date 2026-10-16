@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { QueryResult } from "./api.ts";
-import { explicitFacts, mapExplicit } from "./explicitCharts.ts";
+import { axisTitle, metricLabel } from "../components/charts/format.ts";
+import { explicitFacts, mapExplicit, quadrantOf } from "./explicitCharts.ts";
 import type { DualAxisSeries, PieSeries, ScatterSeries, StackedSeries } from "./explicitCharts.ts";
 import { mapResult } from "./resultMapping.ts";
 
@@ -24,10 +25,13 @@ test("scatter maps x, y, units and labels from the first string column", () => {
   assert.equal(s.kind, "scatter");
   assert.equal(s.title, "ADR vs occupancy");
   assert.equal(s.xLabel, "ADR");
-  assert.equal(s.yLabel, "Occupancy Pct");
+  assert.equal(s.yLabel, "Occupancy");
+  assert.equal(s.xTitle, "ADR ($)");
+  assert.equal(s.yTitle, "Occupancy (%)");
   assert.equal(s.xUnit, "currency");
   assert.equal(s.yUnit, "percent");
-  assert.deepEqual(s.points[0], { label: "Harbor Inn", x: 100, y: 60 });
+  assert.deepEqual(s.points[0], { label: "Harbor Inn", x: 100, y: 60, quadrant: "weak" });
+  assert.deepEqual(s.points.map((p) => p.quadrant), ["weak", "weak", "strong", "strong"]);
   assert.equal(s.points.length, 4);
 });
 
@@ -155,7 +159,7 @@ test("scatter facts: top and bottom on y, correlation only when |r| >= 0.5", () 
   assert.match(facts[0], /Bay View/);
   assert.match(facts[0], /91\.0%/);
   assert.match(facts[1], /Harbor Inn/);
-  assert.match(facts[2], /Higher ADR tends to higher Occupancy Pct/);
+  assert.match(facts[2], /Higher ADR tends to higher Occupancy/);
 
   const flat = [
     { n: "A", x: 1, y: 5 },
@@ -292,4 +296,20 @@ test("combo formats date-like x as MM/DD, or month names when all on the 1st", (
   ];
   const b = mapExplicit(result("combo", { x: "d", y: ["rooms_sold"], y2: "adr" }, monthly)) as DualAxisSeries;
   assert.deepEqual(b.labels, ["Jan", "Feb"]);
+});
+
+test("metricLabel strips ratio suffixes; axisTitle appends the unit", () => {
+  assert.equal(metricLabel("occupancy_pct"), "Occupancy");
+  assert.equal(metricLabel("adr"), "ADR");
+  assert.equal(axisTitle("adr", "currency"), "ADR ($)");
+  assert.equal(axisTitle("occupancy_pct", "percent"), "Occupancy (%)");
+  assert.equal(axisTitle("mpi", "index"), "MPI (index)");
+  assert.equal(axisTitle("rooms_sold", "number"), "Rooms Sold");
+});
+
+test("quadrantOf splits at the medians; ties count as high", () => {
+  const xs = [1, 2, 3, 4, 5];
+  const ys = [5, 1, 3, 4, 2];
+  const q = xs.map((x, i) => quadrantOf(x, ys[i], 3, 3));
+  assert.deepEqual(q, ["busy", "weak", "strong", "strong", "pricey"]);
 });
