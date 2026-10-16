@@ -158,3 +158,19 @@ test("comboSeries shape", () => {
   assert.deepEqual(c.line.values, [10, 20]);
   assert.equal(c.line.color, "market");
 });
+
+test("12-month trend yields exactly 12 buckets when latest date is mid-month", () => {
+  const ds = dates(365, Date.UTC(2025, 9, 17));
+  assert.equal(ds[0], "2025-10-17");
+  assert.equal(ds[364], "2026-10-16");
+  const buckets = trendBuckets(
+    ds.map((d) => mk("a", d, 10, 50, 4)),
+    "ytd",
+    "2026-10-16",
+  );
+  assert.equal(buckets.length, 12);
+  assert.equal(buckets[0].key, "2025-11");
+  assert.equal(buckets[11].key, "2026-10");
+  assert.equal(buckets[11].partial, true);
+  assert.equal(buckets[0].partial, false);
+});

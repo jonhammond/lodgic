@@ -19,6 +19,10 @@ test("daily tails", () => {
   assert.equal(isNpsCsatQuestion("NPS and CSAT by segment: latest day"), "daily");
 });
 
+test("trailing question mark is accepted", () => {
+  assert.equal(isNpsCsatQuestion("NPS and CSAT by segment?"), "mtd");
+});
+
 test("mtd tails", () => {
   assert.equal(isNpsCsatQuestion("NPS and CSAT by segment over the last 30 days"), "mtd");
   assert.equal(isNpsCsatQuestion("NPS and CSAT by segment this month"), "mtd");

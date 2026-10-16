@@ -18,11 +18,12 @@ import { wrapLabel } from "./rows";
 import { formatNumber, formatPercent } from "./format";
 import { niceCeil } from "./scale";
 
-// Left gutter fits "100% (5.0)" in mono 10px; bottom fits two wrapped label lines.
+// Left gutter fits "100% (5.0)" in mono 10px plus tick padding; bottom fits two wrapped label lines.
 const PAD = { top: 10, bottom: 34, left: 66, right: 40 };
 const SELECTABLE_BOTTOM = 10;
 const NARROW_W = 360;
-const NARROW_PAD = { left: 58, right: 34 };
+const NARROW_PAD = { left: 68, right: 34 };
+const DIM_OPACITY = 0.7; // non-selected bars; keeps >=3:1 against the dark card
 const PLOT_H = 200;
 const GAP = 8;
 const MAX_BAR_W = 28;
@@ -173,7 +174,7 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
                       fill: ({ active, datum }: { active?: boolean; datum?: BarDatum }) =>
                         active || selectedIndex === (datum?.x ?? 0) - 1 ? barColor.line : barColor.bar,
                       fillOpacity: ({ datum }: { datum?: BarDatum }) =>
-                        selectedIndex != null && selectedIndex !== (datum?.x ?? 0) - 1 ? 0.55 : 1,
+                        selectedIndex != null && selectedIndex !== (datum?.x ?? 0) - 1 ? DIM_OPACITY : 1,
                       cursor: "pointer",
                     }
                   : {
@@ -221,6 +222,8 @@ export function ScoreComboChart({ series, selectedIndex = null, onSelect, note, 
             <LabelCell
               key={`${i}-${label}`}
               label={label ?? ""}
+              text={names[i] ?? label ?? ""}
+              narrow={narrow}
               selected={selectedIndex === i}
               underline={barColor.bar}
               onPress={() => onSelect(i)}
@@ -252,9 +255,13 @@ function LabelCell({
   label,
   selected,
   underline,
+  text,
+  narrow,
   onPress,
 }: {
   label: string;
+  text: string;
+  narrow: boolean;
   selected: boolean;
   underline: string;
   onPress: () => void;
@@ -266,7 +273,7 @@ function LabelCell({
       accessibilityRole="button"
       accessibilityLabel={`Show ${label}`}
       accessibilityState={{ selected }}
-      style={styles.labelCell}
+      style={[styles.labelCell, narrow && styles.labelCellNarrow]}
     >
       {(state: PressableStateCallbackType) => {
         const hovered = (state as PressableStateCallbackType & { hovered?: boolean }).hovered;
@@ -281,7 +288,7 @@ function LabelCell({
                 hovered && !selected && styles.labelHover,
               ]}
             >
-              {label}
+              {text}
             </Text>
             <View style={[styles.labelUnderline, selected && { backgroundColor: underline }]} />
           </>
@@ -304,6 +311,7 @@ const styles = StyleSheet.create({
   note: { fontFamily: fonts.mono400, fontSize: 11, ...tabular },
   labelRow: { flexDirection: "row" },
   labelCell: { flex: 1, alignItems: "center", paddingTop: 6, paddingHorizontal: 2, cursor: "pointer" },
+  labelCellNarrow: { paddingHorizontal: 0 },
   labelText: { textAlign: "center", lineHeight: 12 },
   labelHover: { textDecorationLine: "underline" },
   labelUnderline: { height: 2, alignSelf: "stretch", marginTop: 4, backgroundColor: "transparent" },

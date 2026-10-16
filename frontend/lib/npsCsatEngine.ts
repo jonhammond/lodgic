@@ -119,6 +119,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 export function trendBuckets(rows: GuestRow[], timeframe: Timeframe, latestDate: string): TrendBucket[] {
   const dates = rows.map((r) => r.metric_date);
+  // Daily deliberately uses the trailing-30-day (mtd) window for the trend.
   if (timeframe !== "ytd") {
     return [...windowDates(dates, "mtd", latestDate)].sort().map((d) => ({
       key: d,
@@ -137,7 +138,8 @@ export function trendBuckets(rows: GuestRow[], timeframe: Timeframe, latestDate:
   const last = latestDate.slice(0, 7);
   const [ly, lm] = last.split("-").map(Number);
   const lastIsFull = Number(latestDate.slice(8, 10)) === new Date(Date.UTC(ly, lm, 0)).getUTCDate();
-  return [...byMonth].map(([key, set]) => ({
+  // 365 days span 13 calendar months unless latestDate is month-end: drop the oldest partial one.
+  return [...byMonth].slice(-12).map(([key, set]) => ({
     key,
     label: `${MONTHS[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}`,
     dates: set,

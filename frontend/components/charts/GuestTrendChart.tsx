@@ -188,7 +188,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
             containerComponent={
               <VictoryVoronoiContainer
                 voronoiDimension="x"
-                voronoiBlacklist={["cross", "dots", "ends"]}
+                voronoiBlacklist={["cross", "dots", /^end-/]}
                 activateData={false}
                 onActivated={(pts: { x?: number }[]) => {
                   const x = pts[0]?.x;
@@ -268,7 +268,7 @@ export function GuestTrendChart({ title, note, trend, hotelName, segmentLabel, f
             {ends.map((e) => (
               <VictoryScatter
                 key={`end-${e.s.key}`}
-                name="ends"
+                name={`end-${e.s.key}`}
                 data={[{ x: e.x, y: e.y, label: fmt(e.s, e.y) }]}
                 size={0}
                 labelComponent={
@@ -358,6 +358,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "baseline",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 10,
   },

@@ -220,7 +220,7 @@ export function NpsCsatPanel({ properties, selectedIds, initialTimeframe, onRows
           ) : null}
           {activeSegment && activeHotel && trend ? (
             <GuestTrendChart
-              title={`${activeHotel.name}, ${tfLabel}`}
+              title={`${activeHotel.name}, ${timeframe === "daily" ? "30 days" : tfLabel}`}
               note={`${timeframe === "ytd" ? "monthly" : "daily"}, rooms-sold-weighted`}
               trend={trend}
               hotelName={activeHotel.name}
