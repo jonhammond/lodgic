@@ -1,10 +1,11 @@
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { Pressable, PressableStateCallbackType, StyleSheet, Text, View } from "react-native";
 import { fonts, radius, space } from "../theme/tokens";
 import { Logo } from "./Logo";
 import { useTheme } from "../theme/useTheme";
 
 const TOGGLE_VIOLET_LIGHT = "#5b3fa6";
+const BAR_H = 48;
 
 type Props = {
   selectedCount: number;
@@ -28,7 +29,13 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
         },
       ]}
     >
-      <Logo size={30} />
+      {wide ? (
+        <Logo width={space.railW} height={space.railW} />
+      ) : (
+        <View style={styles.barLogo}>
+          <Logo width={BAR_H} height={BAR_H} iconSize={24} />
+        </View>
+      )}
       <View
         style={
           wide
@@ -48,7 +55,7 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
           ];
         }}
       >
-        <Feather name="list" size={16} color={t.text.onAccent} />
+        <Ionicons name="business" size={16} color={t.text.onAccent} />
         <View style={[styles.badge, { backgroundColor: t.accent.pink }]}>
           <Text style={styles.badgeText}>{selectedCount}</Text>
         </View>
@@ -75,16 +82,18 @@ const styles = StyleSheet.create({
   column: {
     width: space.railW,
     alignItems: "center",
-    paddingVertical: 18,
+    paddingBottom: 18,
     gap: 14,
   },
   bar: {
-    height: 48,
+    height: BAR_H,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingRight: 16,
     gap: 14,
   },
+  // Bottom border is drawn by the bar; the logo tile fills the remaining height flush to the left edge.
+  barLogo: { height: BAR_H - 1, justifyContent: "center" },
   square: {
     width: 38,
     height: 38,
