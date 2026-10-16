@@ -13,6 +13,9 @@ type Props = {
 
 export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }: Props) {
   const { t, wide } = useTheme();
+  // Dark: amber sun with a dark glyph (white on amber is ~1.9:1). Light: violet moon with a white glyph.
+  const toggleBg = scheme === "dark" ? t.accent.amber : t.accent.violet;
+  const toggleFg = scheme === "dark" ? t.bg.rail : t.text.onAccent;
   return (
     <View
       style={[
@@ -57,11 +60,11 @@ export function Rail({ selectedCount, onOpenProperties, scheme, onToggleTheme }:
           const hovered = (state as PressableStateCallbackType & { hovered?: boolean }).hovered;
           return [
             styles.square,
-            { backgroundColor: t.accent.violet, opacity: hovered || state.pressed ? 0.85 : 1 },
+            { backgroundColor: toggleBg, opacity: hovered || state.pressed ? 0.85 : 1 },
           ];
         }}
       >
-        <Feather name={scheme === "dark" ? "sun" : "moon"} size={16} color={t.text.onAccent} />
+        <Feather name={scheme === "dark" ? "sun" : "moon"} size={16} color={toggleFg} />
       </Pressable>
     </View>
   );
