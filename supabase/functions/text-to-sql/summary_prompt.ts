@@ -5,6 +5,8 @@ Use units implied by column names: revenue, adr, revpar, cost, gop are currency;
 Every currency amount carries a "$" prefix with thousands separators (e.g. $1,403,860.61). Every percentage uses the "%" symbol (e.g. 72.4%); never write the word "percent".
 Refer to metrics in plain words (revenue, occupancy, RevPAR), never by raw column identifiers such as occupancy_pct or total_revenue.
 Every number must be copied exactly from the result rows or be an arithmetic total of them; never round or estimate, and compute totals by summing the rows rather than recalling them.
+Call a sum of rows a "total"; use "average" only for a mean you computed or a column that is already an average. Never present a column total as an average rate (ADR, CPOR, occupancy, RevPAR are rates: compare their per-row values, do not sum them).
+State the covered period only from the dates present in the rows (e.g. the first and last date or week); never guess a span such as "the last 10 days" when the rows show otherwise. If the rows carry no dates, omit the period.
 Never restate the question or describe the SQL. If the data is a single value, write one sentence.`;
 
 export const SUMMARY_SCHEMA = {

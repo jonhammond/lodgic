@@ -66,6 +66,9 @@ Deno.test("system prompt requires exact numbers and computed totals", () => {
       "copied exactly from the result rows",
       "never round or estimate",
       "compute totals by summing the rows rather than recalling them",
+      'Call a sum of rows a "total"',
+      "Never present a column total as an average rate",
+      "State the covered period only from the dates present in the rows",
     ]
   ) {
     assert(SUMMARY_SYSTEM_PROMPT.includes(s), `missing rule: ${s}`);
