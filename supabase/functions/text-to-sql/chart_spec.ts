@@ -38,6 +38,8 @@ export const EXPLICIT_FORM_TRIGGERS: readonly ExplicitFormTrigger[] = [
   trigger("right axis"),
   trigger("bar chart with a line"),
   trigger("bars with \u2026 line", "bars? with .{0,40}?line"),
+  // The one "X vs Y" pairing that is a form request: it mirrors the RevPAR vs occupancy chip.
+  trigger("revpar vs occupancy", "revpar\\s+(?:vs\\.?|versus)\\s+occupancy"),
 ];
 
 /**

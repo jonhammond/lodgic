@@ -249,10 +249,26 @@ Deno.test("requestsExplicitForm fires on dual-axis and bars-with-line wording", 
   }
 });
 
-Deno.test("requestsExplicitForm is false for plain comparisons", () => {
+Deno.test("requestsExplicitForm fires on RevPAR vs occupancy, the chip pairing", () => {
   for (
     const q of [
       "RevPAR vs occupancy",
+      "revpar vs. occupancy by property, last 60 days",
+      "Show RevPAR versus occupancy",
+    ]
+  ) {
+    assert(requestsExplicitForm(q), `missed: ${q}`);
+  }
+  assert(
+    !requestsExplicitForm("Occupancy vs RevPAR"),
+    "reverse order stays plain",
+  );
+  assert(!requestsExplicitForm("RevPAR and occupancy"), "'and' stays plain");
+});
+
+Deno.test("requestsExplicitForm is false for plain comparisons", () => {
+  for (
+    const q of [
       "CPOR vs ADR by property",
       "NPS and CSAT by segment",
       "ADR vs occupancy by property",

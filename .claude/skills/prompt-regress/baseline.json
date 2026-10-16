@@ -16,12 +16,12 @@
   },
   {
     "question": "RevPAR vs occupancy",
-    "chart": "bar",
-    "title": "RevPAR vs Occupancy by Property",
+    "chart": "combo",
+    "title": "RevPAR vs Occupancy",
     "columns": [
-      "avg_occupancy",
-      "avg_revpar",
-      "name"
+      "name",
+      "occupancy_pct",
+      "revpar"
     ],
     "rowCount": 10,
     "period_label": "Last 30 days",
@@ -44,7 +44,7 @@
   {
     "question": "Revenue by property this month",
     "chart": "bar",
-    "title": "Total Revenue by Property - Month to Date",
+    "title": "Total Revenue by Property (Month-to-Date)",
     "columns": [
       "name",
       "total_revenue"
