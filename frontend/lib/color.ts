@@ -62,6 +62,13 @@ function faintEnd(hue: string, surface: string, fade: number): string {
   return mix(hue, surface, t);
 }
 
+// Unfocused trend lines recede by mixing toward the card rather than by alpha: uniform alpha drops the paler
+// ramp hues (~2:1 at full strength) below the ordinal floor. The mix backs off until the stroke keeps
+// MIN_FAINT_CONTRAST; a hue already under the floor is returned unchanged (focus then reads from stroke width).
+export function dimStroke(hex: string, surface: string, fade = 0.45): string {
+  return contrast(hex, surface) < MIN_FAINT_CONTRAST ? hex : faintEnd(hex, surface, fade);
+}
+
 // n shades of `hue` from deep (index 0) to faint (index n-1) for bars on `surface`.
 export function barRamp(hue: string, surface: string, scheme: Scheme, n: number): string[] {
   const { deepen, fade, toward } = scheme === "dark" ? DARK : LIGHT;

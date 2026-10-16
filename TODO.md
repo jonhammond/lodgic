@@ -6,7 +6,7 @@
 
 ## Visual QA findings (2026-10-15, chart-reviewer)
 
-- [ ] Unpinned lines and legend swatches in the multi-property `TrendLineChart` are alpha-dimmed to near-invisible (pastel on white, dim on the dark card); only readable after pinning. Raise the dim floor.
+- [x] Unpinned lines and legend swatches in the multi-property `TrendLineChart` are alpha-dimmed to near-invisible (pastel on white, dim on the dark card); only readable after pinning. Raise the dim floor.
 - [ ] `ScoreComboChart` at 360px: x tick labels truncate ("Upper Midsc…"), and the title truncates because the subtitle shares its row. Abbreviate/rotate ticks on narrow; wrap the subtitle onto its own line.
 - [ ] Result header at 360px: the "Answer" heading butts against the period/rows meta text with no gap and the meta wraps under it. Add `gap` / `flexWrap` in the header row.
 - [ ] Light `GroupedBarChart` ADR green `#16956a` and CPOR amber `#b07f12` have near-identical luminance, so they separate by hue only under deuteranopia/protanopia. Legend, value labels and fixed bar order mitigate; consider a lightness offset.

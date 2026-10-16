@@ -8,6 +8,7 @@ import {
   VictoryScatter,
   VictoryVoronoiContainer,
 } from "victory";
+import { dimStroke } from "../../lib/color";
 import { formatByUnit, TrendSeries } from "../../lib/resultMapping";
 import { fonts, radius, tabular } from "../../theme/tokens";
 import { useTheme } from "../../theme/useTheme";
@@ -163,9 +164,8 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
     const focused = s.name === focus;
     const dim = focus !== null && !focused;
     return {
-      stroke: colorOf(s),
+      stroke: dim ? dimStroke(colorOf(s), t.bg.card) : colorOf(s),
       strokeWidth: focused ? 3 : 2,
-      opacity: dim ? 0.35 : 1,
       strokeLinejoin: "round" as const,
       strokeLinecap: "round" as const,
     };
@@ -407,7 +407,7 @@ export function TrendLineChart({ series, selected, onSelect }: Props) {
                     styles.legendItem,
                     {
                       borderColor: selected || hovered ? t.border.strongHover : "transparent",
-                      opacity: focus !== null && focus !== s.name ? 0.5 : 1,
+                      opacity: focus !== null && focus !== s.name ? 0.7 : 1,
                     },
                   ];
                 }}
