@@ -2,9 +2,12 @@
 
 ## ADR rate/volume charts (2026-10-15 leftovers)
 
-- [ ] Trend ramp contrast: several `theme.trend.ramp` colours fall under 3:1 against the card when used as the 2.5px line in `RateVolumeChart` (light: `#26c4ac`, `#58a0ea`, `#e66fa6`, `#f08c3a`; dark: `#3356c4`, `#7e3bb0`, `#b5265f`, `#c44711`). Rework the shared ramp or give the combo line a contrast-safe variant.
-- [ ] `PropertyTable` at 360px clips the second metric column (Rooms Sold) when a long-format result carries two metrics; property names also wrap. Pre-existing, now visible on the ADR preset. The table already sits in a horizontal `ScrollView` with `inner.minWidth: 520`, so the fix is column flex / `numberOfLines`, not scrolling.
-- [ ] Single-property result: trend and combo lines use the market accent, but the table's ADR bar uses `ramp[0]` via `seriesOrder`. Align the colour source.
-- [ ] Summary stage: Gemini sometimes writes "over the last 10 days" for a 30-day query, and on "CPOR vs ADR by property" reports the column sums ($2,904.16 / $1,686.00) as "average" ADR / CPOR. `SUMMARY_SYSTEM_PROMPT` already requires exact values; add (a) state the covered period from the row dates, never a guessed span, and (b) call a sum a "total" and only a mean an "average". Then `/prompt-regress`, then `/fn-deploy`.
-- [ ] Light-mode bar contrast (also throttles the new `barRamp`: light green/amber ramps clamp to ~0.13 total lightness span, rank barely legible from shade until these hues are lifted): `accents.green` (`#2acc8a`, ~2.1:1) and `accents.amber` (`#e0a526`, ~2.2:1) fall under 3:1 on the white card. Shared by `CategoryBarChart`, `MetricBarChart` and the new `GroupedBarChart` (ADR + CPOR bars); dark mode passes (~6:1). Consider light-only `kpi.adr.bar` / `kpi.cost.bar` overrides in `theme/tokens.ts`.
-- [ ] Dark-mode guest pink (also throttles the new `barRamp` in dark for occupancy/guest bars): `kpi.guest.bar` (`accents.pink` `#d6286a`) is ~2.7:1 on the dark card `#2a3138`; used by the new `ScoreComboChart` CSAT bars and the occupancy/guest KPI tiles. Add a dark-only lift (e.g. `#f58ab8` from the ramp) in `theme/tokens.ts`.
+- [ ] `/fn-deploy` the summary prompt change (commit d770fd4); production still runs the old summary prompt. Manual only.
+
+## Visual QA findings (2026-10-15, chart-reviewer)
+
+- [ ] Unpinned lines and legend swatches in the multi-property `TrendLineChart` are alpha-dimmed to near-invisible (pastel on white, dim on the dark card); only readable after pinning. Raise the dim floor.
+- [ ] `ScoreComboChart` at 360px: x tick labels truncate ("Upper Midsc…"), and the title truncates because the subtitle shares its row. Abbreviate/rotate ticks on narrow; wrap the subtitle onto its own line.
+- [ ] Result header at 360px: the "Answer" heading butts against the period/rows meta text with no gap and the meta wraps under it. Add `gap` / `flexWrap` in the header row.
+- [ ] Light `GroupedBarChart` ADR green `#16956a` and CPOR amber `#b07f12` have near-identical luminance, so they separate by hue only under deuteranopia/protanopia. Legend, value labels and fixed bar order mitigate; consider a lightness offset.
+- [ ] `PropertyTable` at 360px: all property names wrap (two to three lines); collapsed week headers truncate the subtotal ("avg $314.…") because the bar-column slot is fixed-width; Rooms Sold bars are 13–29px so close values (86 vs 97) look identical. Widen the narrow label flex and drop the fixed slot on the narrow group header.
