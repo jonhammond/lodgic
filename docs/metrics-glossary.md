@@ -47,8 +47,8 @@ Integer columns (`rooms_sold`, `bookings`, channel counts, `cancellations`, `roo
 
 | Column | Meaning | Formula / aggregation | Unit | Better | Synonyms |
 | --- | --- | --- | --- | --- | --- |
-| `bookings` | Reservations made that day, including those later cancelled. Equals the sum of the four channels | `sum(bookings)` | count | higher | Reservations, reservation volume, gross bookings, demand, new bookings |
-| `direct_bookings` | Bookings via the hotel's own channels (brand.com, phone, walk-in) | `sum(direct_bookings)`; share = `sum(direct_bookings)::numeric / nullif(sum(bookings), 0) * 100` | count / % | higher share | Direct, direct share, direct mix, website bookings, own channels, direct ratio. Cheapest channel (no commission) |
+| `bookings` | Reservations (including those later cancelled) for that stay date, not bookings created that day. Equals the sum of the four channels | `sum(bookings)` | count | higher | Reservations, reservation volume, gross bookings, demand |
+| `direct_bookings` | Bookings via the hotel's own channels (brand.com, phone) | `sum(direct_bookings)`; share = `sum(direct_bookings)::numeric / nullif(sum(bookings), 0) * 100` | count / % | higher share | Direct, direct share, direct mix, website bookings, own channels, direct ratio. Cheapest channel (no commission) |
 | `ota_bookings` | Bookings via online travel agencies | share = `sum(ota_bookings)::numeric / nullif(sum(bookings), 0) * 100` | count / % | lower share (commission-heavy) | OTA, Expedia, Booking.com, online travel, third-party, indirect, channel dependence |
 | `gds_bookings` | Bookings via global distribution systems (travel agents, corporate travel) | share = `sum(gds_bookings)::numeric / nullif(sum(bookings), 0) * 100` | count / % | neutral | GDS, Sabre, Amadeus, Travelport, corporate travel, travel agent |
 | `group_bookings` | Group / meetings blocks | share = `sum(group_bookings)::numeric / nullif(sum(bookings), 0) * 100` | count / % | neutral | Group, groups, MICE, meetings and events, blocks, conference business |
@@ -103,7 +103,7 @@ Index reading: above 100 = outperforming the comp set, below 100 = losing share.
 | Column | Meaning | Formula / aggregation | Unit | Better | Synonyms |
 | --- | --- | --- | --- | --- | --- |
 | `nps` | Net promoter score, range -100 to 100 | `sum(nps * rooms_sold) / nullif(sum(rooms_sold), 0)` | points | higher | NPS, net promoter, promoter score, loyalty score, recommend |
-| `csat` | Customer satisfaction, 0-5 scale | `sum(csat * rooms_sold) / nullif(sum(rooms_sold), 0)` | score (not %) | higher | CSAT, satisfaction, guest satisfaction, GSS, review score, rating |
+| `csat` | Customer satisfaction, 1-5 scale (stored 0-5) | `sum(csat * rooms_sold) / nullif(sum(rooms_sold), 0)` | score (not %) | higher | CSAT, satisfaction, guest satisfaction, GSS, review score, rating |
 | `repeat_guest_pct` | Share of guests who are returning, 0-100 | `sum(repeat_guest_pct * rooms_sold) / nullif(sum(rooms_sold), 0)` | % | higher | Repeat guests, returning guests, repeat rate, loyalty, retention, repeat stays |
 
 ## daily_metrics: housekeeping

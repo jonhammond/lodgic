@@ -86,6 +86,42 @@ export const METRIC_COLUMNS: readonly string[] = [
   "housekeeping_hours",
 ];
 
+/** Which way is better per column; reused by the SQL and summary prompts. */
+export const METRIC_DIRECTION = {
+  higher: [
+    "rooms_sold",
+    "total_revenue",
+    "adr",
+    "occupancy_pct",
+    "revpar",
+    "direct_bookings",
+    "gop",
+    "mpi",
+    "ari",
+    "rgi",
+    "nps",
+    "csat",
+    "repeat_guest_pct",
+  ],
+  lower: [
+    "ota_bookings",
+    "cancellations",
+    "rooms_cost",
+    "fnb_cost",
+    "admin_cost",
+    "marketing_cost",
+    "maintenance_cost",
+    "utilities_cost",
+    "total_cost",
+    "cpor",
+    "housekeeping_hours",
+  ],
+} as const;
+
+export const DIRECTION_LINE = `Direction: higher is better: ${
+  METRIC_DIRECTION.higher.join(", ")
+}; lower is better: ${METRIC_DIRECTION.lower.join(", ")}.`;
+
 export const SYSTEM_PROMPT =
   `You translate hospitality analytics questions into one read-only PostgreSQL query.
 
@@ -105,10 +141,31 @@ Schema (schema public):
     mpi numeric (generated: occupancy_pct / market_occupancy_pct * 100),
     ari numeric (generated: adr / market_adr * 100),
     rgi numeric (generated: revpar / market_revpar * 100),
-    nps numeric (-100..100), csat numeric (1-5), repeat_guest_pct numeric (0-100),
+    nps numeric (-100..100), csat numeric (1-5 scale, stored 0-5), repeat_guest_pct numeric (0-100),
     rooms_cleaned int, housekeeping_hours numeric,
     unique(property_id, metric_date))
   adr = total_revenue / rooms_sold; occupancy_pct is a percentage (0-100); revpar = revenue per available room.
+
+Vocabulary: (term, term -> column or formula)
+occupied rooms, room nights sold, RNS -> rooms_sold
+revenue, sales, top line -> total_revenue
+average rate, ADR -> adr
+occupancy, occ, fill -> occupancy_pct
+RevPAR, yield -> revpar
+keys, inventory, available rooms -> total_rooms
+chain scale, tier -> segment
+comp set, compset -> market_occupancy_pct, market_adr, market_revpar
+MPI, penetration -> mpi; ARI, rate index -> ari; RGI, revpar index -> rgi
+direct share -> direct_bookings / bookings; OTA share -> ota_bookings / bookings; cancel rate -> cancellations / bookings
+lead time, booking window -> avg_booking_window_days
+A&G, overhead -> admin_cost; S&M, marketing spend -> marketing_cost; POM, R&M -> maintenance_cost; energy -> utilities_cost; F&B cost -> fnb_cost; rooms expense -> rooms_cost
+opex, total expenses -> total_cost
+profit, GOP -> gop; GOP margin, margin -> gop / total_revenue; GOPPAR -> gop / total_rooms
+CPOR, unit cost -> cpor
+satisfaction, rating -> csat; promoter score -> nps; repeat guests, returning guests -> repeat_guest_pct
+rooms per hour, productivity -> rooms_cleaned / housekeeping_hours; labor hours -> housekeeping_hours
+
+${DIRECTION_LINE}
 
 Rules:
 - Output exactly one SELECT or WITH ... SELECT statement. Never end with a semicolon and never use semicolons anywhere.
@@ -138,7 +195,12 @@ Rules:
 - recommended_chart: line for time series, bar for category comparisons and the ranking and total cases above, kpi for a single-row single-value answer, table otherwise.
 - report_title: a short human-readable title.
 - caveat: optional single sentence a reader needs before trusting the result, e.g. a requested metric is not tracked so a proxy is used, or the period is partial (month-to-date). Leave empty when there is none.
-- period_label: the period the query actually covers, as a short phrase such as "Last 30 days", "Last 60 days", "Month to date", "Yesterday". period_source: "question" when the question named the period, "default" when the missing-period rule supplied it.`;
+- period_label: the period the query actually covers, as a short phrase such as "Last 30 days", "Last 60 days", "Month to date", "Yesterday". period_source: "question" when the question named the period, "default" when the missing-period rule supplied it.
+- Chart-form rules (this and the next three bullets) apply only to the exact phrasings they list; for every other question never output scatter, pie, stacked_bar or combo.
+- Explicit chart form - only when the question names "scatter", "pie", "donut", "share of", "stacked", "combo", "bar and line", or "on a second axis": honour it with recommended_chart scatter, pie, stacked_bar or combo, shape the SQL for it, and fill chart_spec {x, y, y2, label} with the exact column aliases used in the SQL.
+- No-fit chart form - only these cases, when the question names no chart form: only a question whose text contains "ADR vs occupancy" or "occupancy vs ADR" together with "by property" -> scatter; a question mentioning RevPAR, CPOR, NPS or CSAT is never scatter. Every other metric pairing ("RevPAR vs occupancy" stays a single-row kpi, "CPOR vs ADR by property" stays a bar, "NPS and CSAT by segment" stays a bar) follows the earlier rules and is never scatter or combo; parts of a whole in one period (channel mix, cost breakdown) with no property axis -> pie, with a property axis -> stacked_bar.
+- SQL shape per chart form: scatter = name, <x_metric>, <y_metric> one row per property (chart_spec x = x_metric alias, y = [y_metric alias], label = name); pie = <label>, <value> with at most 8 rows (x = label, y = [value]); stacked_bar = name, <part1>, <part2>, ... wide format, one column per part (x = name, y = all part aliases); combo = <x>, <bar_metric>, <line_metric> (x = <x>, y = [bar_metric], y2 = line_metric).
+- chart_spec is null for bar, line, kpi and table, and for any question these chart-form rules do not name: never choose scatter, pie, stacked_bar or combo unless an Explicit or No-fit rule above matches, otherwise recommended_chart follows the earlier rules exactly; all other recommended_chart behaviour is unchanged.`;
 
 export const RESPONSE_SCHEMA = {
   type: "OBJECT",

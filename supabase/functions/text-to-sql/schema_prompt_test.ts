@@ -1,11 +1,14 @@
 import {
   CHARTS,
+  DIRECTION_LINE,
   METRIC_COLUMNS,
+  METRIC_DIRECTION,
   parsePeriod,
   PERIOD_LABEL_MAX,
   PERIOD_SOURCES,
   SYSTEM_PROMPT,
 } from "./schema_prompt.ts";
+import { SUMMARY_SYSTEM_PROMPT } from "./summary_prompt.ts";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
@@ -154,4 +157,103 @@ Deno.test("parsePeriod tolerates missing fields and non-objects", () => {
   assert(b.period_label === null && b.period_source === null, "null input");
   const c = parsePeriod({ period_label: 42, period_source: 7 });
   assert(c.period_label === null && c.period_source === null, "wrong types");
+});
+
+function vocabularyEntries(): { terms: string[]; target: string }[] {
+  const m = SYSTEM_PROMPT.match(/\nVocabulary:[^\n]*\n([\s\S]*?)\n\n/);
+  assert(m !== null, "missing Vocabulary block");
+  const entries: { terms: string[]; target: string }[] = [];
+  for (const line of (m as RegExpMatchArray)[1].split("\n")) {
+    for (const part of line.split(";")) {
+      const [lhs, rhs, ...rest] = part.split("->");
+      assert(
+        rhs !== undefined && rest.length === 0,
+        `bad vocab entry: ${part}`,
+      );
+      const terms = lhs.split(",").map((t) => t.trim()).filter(Boolean);
+      assert(terms.length > 0, `vocab entry without terms: ${part}`);
+      entries.push({ terms, target: rhs.trim() });
+    }
+  }
+  return entries;
+}
+
+Deno.test("every vocabulary term maps to a METRIC_COLUMNS column or a formula over them", () => {
+  const entries = vocabularyEntries();
+  assert(entries.length >= 15, `vocabulary too small: ${entries.length}`);
+  const cols = new Set(METRIC_COLUMNS);
+  for (const { terms, target } of entries) {
+    const idents = target.match(/[a-z][a-z0-9]*(?:_[a-z0-9]+)*/g) ?? [];
+    const metric = idents.filter((i) => cols.has(i));
+    assert(metric.length > 0, `no metric column for: ${terms.join(", ")}`);
+    for (const id of idents) {
+      assert(
+        cols.has(id) || /^(nullif|sum|numeric)$/.test(id),
+        `unknown identifier "${id}" for: ${terms.join(", ")}`,
+      );
+    }
+  }
+});
+
+Deno.test("vocabulary block stays compact", () => {
+  const m = SYSTEM_PROMPT.match(/\nVocabulary:[^\n]*\n([\s\S]*?)\n\n/);
+  const lines = (m as RegExpMatchArray)[1].split("\n").length;
+  assert(lines <= 20, `vocabulary has ${lines} lines`);
+});
+
+Deno.test("METRIC_DIRECTION columns are METRIC_COLUMNS and disjoint", () => {
+  const cols = new Set(METRIC_COLUMNS);
+  const higher: readonly string[] = METRIC_DIRECTION.higher;
+  const lower: readonly string[] = METRIC_DIRECTION.lower;
+  for (const c of [...higher, ...lower]) {
+    assert(cols.has(c), `direction column not in METRIC_COLUMNS: ${c}`);
+  }
+  for (const c of higher) assert(!lower.includes(c), `in both lists: ${c}`);
+  assert(higher.length > 0 && lower.length > 0, "empty direction list");
+});
+
+Deno.test("system and summary prompts both carry the direction line", () => {
+  assert(DIRECTION_LINE.startsWith("Direction:"), "bad direction line");
+  assert(
+    SYSTEM_PROMPT.includes(DIRECTION_LINE),
+    "direction line not in SQL prompt",
+  );
+  assert(
+    SUMMARY_SYSTEM_PROMPT.includes(DIRECTION_LINE),
+    "direction line not in summary prompt",
+  );
+  for (const c of METRIC_DIRECTION.higher) {
+    assert(DIRECTION_LINE.includes(c), `direction line lacks ${c}`);
+  }
+  for (const c of METRIC_DIRECTION.lower) {
+    assert(DIRECTION_LINE.includes(c), `direction line lacks ${c}`);
+  }
+});
+
+Deno.test("chart-form rules are appended after every earlier Rules bullet and phrasing-scoped", () => {
+  const rules = SYSTEM_PROMPT.slice(SYSTEM_PROMPT.indexOf("\nRules:"));
+  const bullets = rules.split("\n- ");
+  const idx = (needle: string) => bullets.findIndex((b) => b.includes(needle));
+  const scope = idx("Chart-form rules (this and the next three bullets)");
+  const explicit = idx("Explicit chart form");
+  assert(scope === explicit - 1, "scope bullet must precede explicit rule");
+  const noFit = idx("No-fit chart form");
+  const shape = idx("SQL shape per chart form");
+  const nullSpec = idx("chart_spec is null for bar, line, kpi and table");
+  assert(
+    explicit > idx("period_label: the period"),
+    "must follow period bullet",
+  );
+  assert(noFit === explicit + 1, "no-fit rule must follow explicit rule");
+  assert(shape === noFit + 1, "shape rule must follow no-fit rule");
+  assert(nullSpec === shape + 1, "null-spec rule must follow shape rule");
+  assert(nullSpec === bullets.length - 1, "chart-form rules must be last");
+  const block = bullets.slice(explicit).join("\n- ");
+  for (const kind of ["scatter", "pie", "stacked_bar", "combo"]) {
+    assert(block.includes(kind), `missing ${kind}`);
+  }
+  assert(
+    block.includes("all other recommended_chart behaviour is unchanged"),
+    "missing unchanged statement",
+  );
 });
